@@ -1,0 +1,2814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Campus Ledger - Shared Expense & PO Tracker</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18 and Babel Standalone for direct in-browser compilation -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* Print-specific layout optimizations */
+    @media print {
+      body { background: white !important; color: black !important; font-size: 12pt; }
+      .no-print, header, nav, #bottom-nav, .modal-backdrop, button { display: none !important; }
+      .print-only { display: block !important; }
+      .print-card { border: 1px solid #ccc !important; box-shadow: none !important; margin: 0 !important; width: 100% !important; page-break-inside: avoid; }
+    }
+    .print-only { display: none; }
+    /* Mobile-first scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen pb-20 md:pb-6">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // =========================================================================
+    // SECTION 1: CONFIG & SEED DATA
+    // =========================================================================
+    const INITIAL_CONFIG_CLUBS = [
+      // Department Associations
+      { id: 'aimsa', name: 'AIMSA (AI & Machine Learning)', type: 'other', subClubs: [], treasurerName: 'Aarav Sharma', treasurerContact: '+91 98201 11111', plainCode: '1111', annualBudget: 45000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'cesa', name: 'CESA (Computer Engineering)', type: 'other', subClubs: [], treasurerName: 'Bhavna Patel', treasurerContact: '+91 98201 22222', plainCode: '2222', annualBudget: 60000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'cresa', name: 'CRESA (Chemical Engineering)', type: 'other', subClubs: [], treasurerName: 'Chetan Iyer', treasurerContact: '+91 98201 33333', plainCode: '3333', annualBudget: 35000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'itsa', name: 'ITSA (Information Tech)', type: 'other', subClubs: [], treasurerName: 'Divya Nair', treasurerContact: '+91 98201 44444', plainCode: '4444', annualBudget: 50000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'etsa', name: 'ETSA (Electronics & Telecom)', type: 'other', subClubs: [], treasurerName: 'Eshan Roy', treasurerContact: '+91 98201 55555', plainCode: '5555', annualBudget: 40000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'ciesa', name: 'CIESA (Civil Engineering)', type: 'other', subClubs: [], treasurerName: 'Farhan Zaidi', treasurerContact: '+91 98201 66666', plainCode: '6666', annualBudget: 30000, status: 'active', failedAttempts: 0, locked: false },
+      
+      // Tech Communities
+      { id: 'gdgc', name: 'GDGC (Google Developer Group)', type: 'other', subClubs: [], treasurerName: 'Gauri Kulkarni', treasurerContact: '+91 98202 11111', plainCode: '1212', annualBudget: 75000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'mlsc', name: 'MLSC (Microsoft Learn Chapter)', type: 'other', subClubs: [], treasurerName: 'Harsh Vardhan', treasurerContact: '+91 98202 22222', plainCode: '2323', annualBudget: 55000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'ir', name: 'IR (Innovators & Robotics)', type: 'other', subClubs: [], treasurerName: 'Ishaan Gupta', treasurerContact: '+91 98202 33333', plainCode: '3434', annualBudget: 70000, status: 'active', failedAttempts: 0, locked: false },
+
+      // Motor Clubs (11 total)
+      { id: 'automatons', name: 'Automatons Racing', type: 'other', subClubs: [], treasurerName: 'Jayant Sen', treasurerContact: '+91 98203 11111', plainCode: '4545', annualBudget: 120000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'maverick', name: 'Team Maverick Aero', type: 'other', subClubs: [], treasurerName: 'Kavya Rao', treasurerContact: '+91 98203 22222', plainCode: '5656', annualBudget: 100000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'ambush', name: 'Ambush Offroaders', type: 'other', subClubs: [], treasurerName: 'Lakshya Jain', treasurerContact: '+91 98203 33333', plainCode: '6767', annualBudget: 90000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'motor4', name: 'Motor Club 4 (EV Dynamics)', type: 'other', subClubs: [], treasurerName: 'Manish Joshi', treasurerContact: '+91 98203 44444', plainCode: '7878', annualBudget: 40000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'motor5', name: 'Motor Club 5 (Karting)', type: 'other', subClubs: [], treasurerName: 'Neha Deshmukh', treasurerContact: '+91 98203 55555', plainCode: '8989', annualBudget: 35000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'motor6', name: 'Motor Club 6 (Solar Vehicle)', type: 'other', subClubs: [], treasurerName: 'Omkar Shinde', treasurerContact: '+91 98203 66666', plainCode: '9090', annualBudget: 60000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'motor7', name: 'Motor Club 7 (Telemetry Lab)', type: 'other', subClubs: [], treasurerName: 'Pranav Mane', treasurerContact: '+91 98203 77777', plainCode: '1313', annualBudget: 30000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'motor8', name: 'Motor Club 8 (Combustion Squad)', type: 'other', subClubs: [], treasurerName: 'Riya Pillai', treasurerContact: '+91 98203 88888', plainCode: '2424', annualBudget: 40000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'motor9', name: 'Motor Club 9 (Drone Dynamics)', type: 'other', subClubs: [], treasurerName: 'Sahil Mehta', treasurerContact: '+91 98203 99999', plainCode: '3535', annualBudget: 50000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'motor10', name: 'Motor Club 10 (Chassis Crew)', type: 'other', subClubs: [], treasurerName: 'Tanvi Gokhale', treasurerContact: '+91 98203 00000', plainCode: '4646', annualBudget: 35000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'motor11', name: 'Motor Club 11 (Precision Moto)', type: 'other', subClubs: [], treasurerName: 'Utkarsh Paul', treasurerContact: '+91 98204 11111', plainCode: '5757', annualBudget: 30000, status: 'active', failedAttempts: 0, locked: false },
+
+      // IEEE Student Branch (Major Club with sub-clubs per dept)
+      { 
+        id: 'ieee', 
+        name: 'IEEE Student Branch', 
+        type: 'major', 
+        subClubs: [
+          'IEEE-Dept 1 (Computer Society)',
+          'IEEE-Dept 2 (Signal Processing)',
+          'IEEE-Dept 3 (Power & Energy)',
+          'IEEE-Dept 4 (Robotics & Automation)',
+          'IEEE-Dept 5 (Women in Engineering)',
+          'IEEE-Dept 6 (Circuits & Systems)'
+        ], 
+        treasurerName: 'Zoya Merchant', 
+        treasurerContact: '+91 98205 99999', 
+        plainCode: '9999', 
+        annualBudget: 150000, 
+        status: 'active', 
+        failedAttempts: 0, 
+        locked: false 
+      }
+    ];
+
+    const SEED_ORDERS = [
+      {
+        id: 'ORD-2026-001',
+        clubId: 'aimsa',
+        subClub: '',
+        requestedBy: 'Rohit Verma',
+        event: 'AI Hackathon 2026',
+        billNo: 'SHP-8812',
+        billDate: '2026-09-20',
+        items: [
+          { name: 'Samosa & Frooti Combo', qty: 60, price: 35 },
+          { name: 'Whiteboard Markers (Pack of 10)', qty: 4, price: 250 },
+          { name: 'Chart Sheets & Pins', qty: 20, price: 15 }
+        ],
+        total: 3400,
+        status: 'Paid',
+        flagged: false,
+        flagReason: '',
+        createdAt: '2026-09-20T10:15:00Z'
+      },
+      {
+        id: 'ORD-2026-002',
+        clubId: 'cesa',
+        subClub: '',
+        requestedBy: 'Priya Dave',
+        event: 'Coding Sprint Round 1',
+        billNo: 'SHP-8845',
+        billDate: '2026-09-24',
+        items: [
+          { name: 'A4 Printing Paper Bundle', qty: 5, price: 320 },
+          { name: 'Tea & Biscuits Tray', qty: 40, price: 30 }
+        ],
+        total: 2800,
+        status: 'Partially paid',
+        flagged: false,
+        flagReason: '',
+        createdAt: '2026-09-24T14:30:00Z'
+      },
+      {
+        id: 'ORD-2026-003',
+        clubId: 'ieee',
+        subClub: 'IEEE-Dept 1 (Computer Society)',
+        requestedBy: 'Aditya S',
+        event: 'Tech Talk: Quantum Basics',
+        billNo: 'SHP-8901',
+        billDate: '2026-09-26',
+        items: [
+          { name: 'Sticky Notes Multicolor', qty: 15, price: 60 },
+          { name: 'Permanent Markers Assorted', qty: 10, price: 40 },
+          { name: 'Guest Welcome Memento Box', qty: 2, price: 450 }
+        ],
+        total: 2200,
+        status: 'Awaiting code',
+        flagged: false,
+        flagReason: '',
+        createdAt: '2026-09-26T11:00:00Z'
+      },
+      {
+        id: 'ORD-2026-004',
+        clubId: 'cresa',
+        subClub: '',
+        requestedBy: 'Kunal Patil',
+        event: 'Chemical Quiz Bowl',
+        billNo: 'SHP-8711',
+        billDate: '2026-09-18',
+        items: [
+          { name: 'Lanyards & Card Holders', qty: 50, price: 25 },
+          { name: 'Mineral Water Crates (24pk)', qty: 2, price: 240 }
+        ],
+        total: 1730,
+        status: 'Rejected',
+        flagged: false,
+        flagReason: '',
+        createdAt: '2026-09-18T09:00:00Z'
+      },
+      {
+        id: 'ORD-2026-005',
+        clubId: 'automatons',
+        subClub: '',
+        requestedBy: 'Vikas Dubey',
+        event: 'Chassis Fabrication Workshop',
+        billNo: 'SHP-8990',
+        billDate: '2026-09-22',
+        items: [
+          { name: 'Industrial Masking Tapes', qty: 12, price: 120 },
+          { name: 'Heavy Duty Permanent Paint Markers', qty: 15, price: 180 },
+          { name: 'Snacks & Energy Drinks (Squad pack)', qty: 45, price: 80 }
+        ],
+        total: 7740,
+        status: 'Authorized',
+        flagged: false,
+        flagReason: '',
+        createdAt: '2026-09-22T16:45:00Z'
+      },
+      {
+        id: 'ORD-2026-006',
+        clubId: 'gdgc',
+        subClub: '',
+        requestedBy: 'Simran Walia',
+        event: 'Campus DevFest Kickoff',
+        billNo: 'SHP-8812', // DELIBERATE DUPLICATE OF ORD-001 BILL NO!
+        billDate: '2026-09-25',
+        items: [
+          { name: 'Spiral Notepad A5', qty: 30, price: 50 },
+          { name: 'Ballpoint Pens (Box of 50)', qty: 2, price: 300 }
+        ],
+        total: 2100,
+        status: 'Awaiting code',
+        flagged: true,
+        flagReason: 'Duplicate Bill Number: "SHP-8812" is already logged on order ORD-2026-001',
+        createdAt: '2026-09-25T13:20:00Z'
+      },
+      {
+        id: 'ORD-2026-007',
+        clubId: 'mlsc',
+        subClub: '',
+        requestedBy: 'Ankit Tiwari',
+        event: 'Azure Cloud Workshop',
+        billNo: 'SHP-9022',
+        billDate: '2026-09-21',
+        items: [
+          { name: 'Sandwich Trays & Hot Coffee', qty: 50, price: 55 },
+          { name: 'Badge Ribbons', qty: 50, price: 15 }
+        ],
+        total: 3500,
+        status: 'Authorized',
+        flagged: false,
+        flagReason: '',
+        createdAt: '2026-09-21T15:10:00Z'
+      },
+      {
+        id: 'ORD-2026-008',
+        clubId: 'itsa',
+        subClub: '',
+        requestedBy: 'Mayur Gaikwad',
+        event: 'Cyber Security Capture The Flag',
+        billNo: 'SHP-9104',
+        billDate: '2026-09-23',
+        items: [
+          { name: 'Red Bull Cans 4-pack', qty: 8, price: 480 },
+          { name: 'Puff Pastries & Chips Boxes', qty: 30, price: 40 }
+        ],
+        total: 5040,
+        status: 'Paid',
+        flagged: false,
+        flagReason: '',
+        createdAt: '2026-09-23T12:00:00Z'
+      },
+      {
+        id: 'ORD-2026-009',
+        clubId: 'maverick',
+        subClub: '',
+        requestedBy: 'Tejaswini M',
+        event: 'Aero-Glider Design Review',
+        billNo: 'SHP-9150',
+        billDate: '2026-09-26',
+        items: [
+          { name: 'Balsa Wood Glue Dispensers', qty: 8, price: 150 },
+          { name: 'Cutting Mats & Steel Rulers', qty: 6, price: 350 },
+          { name: 'Tea Flask Refills', qty: 3, price: 300 }
+        ],
+        total: 4200,
+        status: 'Awaiting code',
+        flagged: false,
+        flagReason: '',
+        createdAt: '2026-09-26T17:00:00Z'
+      },
+      {
+        id: 'ORD-2026-010',
+        clubId: 'ambush',
+        subClub: '',
+        requestedBy: 'Devendra Rana',
+        event: 'Off-Road Suspension Testing Meet',
+        billNo: 'SHP-9201',
+        billDate: '2026-09-25',
+        items: [
+          { name: 'Heavy Duty Zipties (Bulk 500)', qty: 2, price: 450 },
+          { name: 'Energy Snacks & Glucose Drinks', qty: 40, price: 50 }
+        ],
+        total: 2900,
+        status: 'Authorized',
+        flagged: false,
+        flagReason: '',
+        createdAt: '2026-09-25T11:40:00Z'
+      }
+    ];
+
+    const SEED_PAYMENTS = [
+      { id: 'PAY-101', orderId: 'ORD-2026-001', clubId: 'aimsa', amount: 3400, mode: 'UPI', reference: 'UPI/20260920/87192', date: '2026-09-21', note: 'Full settlement via GPay', recordedBy: 'Aarav Sharma' },
+      { id: 'PAY-102', orderId: 'ORD-2026-002', clubId: 'cesa', amount: 1500, mode: 'Cash', reference: 'CASH-REC-041', date: '2026-09-25', note: 'Advance paid at shop counter', recordedBy: 'Bhavna Patel' },
+      { id: 'PAY-103', orderId: 'ORD-2026-008', clubId: 'itsa', amount: 5040, mode: 'Bank transfer', reference: 'NEFT-AXIS-99120', date: '2026-09-24', note: 'Direct IMPS to shopkeeper', recordedBy: 'Divya Nair' }
+    ];
+
+    const SEED_FLAGS = [
+      {
+        id: 'FLG-01',
+        orderId: 'ORD-2026-006',
+        clubId: 'gdgc',
+        reason: 'Duplicate Bill Number: "SHP-8812" already registered by AIMSA on 2026-09-20',
+        status: 'pending', // 'pending', 'resolved_valid', 'confirmed_duplicate'
+        createdAt: '2026-09-25T13:20:00Z',
+        reviewedBy: null,
+        reviewedAt: null
+      }
+    ];
+
+    const SEED_AUDIT = [
+      { id: 'AUD-01', actor: 'Rohit Verma (Member)', action: 'ORDER_CREATED', entity: 'Order', entityId: 'ORD-2026-001', details: 'Raised PO for AI Hackathon 2026 (Rs 3,400)', timestamp: '2026-09-20T10:15:00Z' },
+      { id: 'AUD-02', actor: 'Aarav Sharma (Treasurer)', action: 'ORDER_AUTHORIZED', entity: 'Order', entityId: 'ORD-2026-001', details: 'Verified with secure code', timestamp: '2026-09-20T11:00:00Z' },
+      { id: 'AUD-03', actor: 'Aarav Sharma (Treasurer)', action: 'PAYMENT_RECORDED', entity: 'Payment', entityId: 'PAY-101', details: 'Paid Rs 3,400 via UPI (UPI/20260920/87192)', timestamp: '2026-09-21T09:30:00Z' },
+      { id: 'AUD-04', actor: 'Simran Walia (Member)', action: 'ORDER_CREATED', entity: 'Order', entityId: 'ORD-2026-006', details: 'Raised PO with duplicate bill SHP-8812 (Rs 2,100)', timestamp: '2026-09-25T13:20:00Z' },
+      { id: 'AUD-05', actor: 'SYSTEM_DETECTOR', action: 'DUPLICATE_FLAGGED', entity: 'Order', entityId: 'ORD-2026-006', details: 'Triggered bill number collision check for SHP-8812', timestamp: '2026-09-25T13:20:05Z' }
+    ];
+
+    // =========================================================================
+    // SECTION 2: SECURITY & CRYPTO HELPERS
+    // =========================================================================
+
+    // Compute SHA-256 hash using browser native Web Crypto API
+    async function sha256(text) {
+      const msgBuffer = new TextEncoder().encode(text.trim());
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    /**
+     * Pluggable verification function for Treasurer authentication.
+     * Note for Production / Faculty Architecture:
+     * -------------------------------------------------------------
+     * In an enterprise/campus deployment, this function can be replaced 
+     * by an API call requesting or validating an SMS / WhatsApp OTP:
+     * e.g.,
+     *   const res = await fetch(`/api/auth/otp/verify`, {
+     *      method: 'POST',
+     *      body: JSON.stringify({ clubId, otp: inputCode })
+     *   });
+     *   return res.ok;
+     * -------------------------------------------------------------
+     */
+    async function verifyTreasurerCode(club, inputCode) {
+      if (!club || !inputCode) return false;
+      if (club.locked) return false;
+      const inputHash = await sha256(inputCode);
+      return inputHash === club.codeHash;
+    }
+
+    // Currency Formatter
+    const formatINR = (val) => {
+      const num = Number(val) || 0;
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0
+      }).format(num);
+    };
+
+    // Sanitize string inputs
+    const sanitize = (str) => {
+      if (typeof str !== 'string') return '';
+      return str.replace(/[<>]/g, '').trim();
+    };
+
+    // Normalize bill numbers for fuzzy collision detection
+    const normalizeBillNo = (val) => {
+      return (val || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    };
+
+    // =========================================================================
+    // SECTION 3: MAIN APP (STORE + UI ROUTING)
+    // =========================================================================
+    function App() {
+      // Role Switcher State: 'member' | 'treasurer' | 'shopkeeper' | 'admin'
+      const [role, setRole] = useState('member');
+      const [selectedTreasurerClubId, setSelectedTreasurerClubId] = useState('aimsa');
+      const [demoShowCodes, setDemoShowCodes] = useState(false);
+      
+      // Navigation: 'clubs' | 'new-order' | 'orders' | 'payments' | 'flags' | 'reports' | 'audit'
+      const [activeTab, setActiveTab] = useState('orders');
+
+      // Core Data Collections (Initialized with SHA-256 hashes for security)
+      const [clubs, setClubs] = useState([]);
+      const [orders, setOrders] = useState([]);
+      const [payments, setPayments] = useState([]);
+      const [flags, setFlags] = useState([]);
+      const [auditLogs, setAuditLogs] = useState([]);
+      const [highValueThreshold, setHighValueThreshold] = useState(5000);
+      const [toast, setToast] = useState(null);
+
+      // Modal State for Security Code Entry
+      const [authModal, setAuthModal] = useState({
+        isOpen: false,
+        actionType: null, // 'authorize' | 'reject' | 'record_payment' | 'review_flag'
+        targetOrder: null,
+        targetPaymentData: null,
+        targetFlag: null,
+        decision: null,
+        inputCode: '',
+        errorMessage: ''
+      });
+
+      // Printable Modal / Statement View
+      const [printPreview, setPrintPreview] = useState(null); // { type: 'order'|'club', data: ... }
+
+      // -------------------------------------------------------------
+      // INITIALIZATION & LOCAL STORAGE PERSISTENCE
+      // -------------------------------------------------------------
+      useEffect(() => {
+        const initAppData = async () => {
+          const cachedClubs = localStorage.getItem('cl_clubs_v2');
+          const cachedOrders = localStorage.getItem('cl_orders_v2');
+          const cachedPayments = localStorage.getItem('cl_payments_v2');
+          const cachedFlags = localStorage.getItem('cl_flags_v2');
+          const cachedAudit = localStorage.getItem('cl_audit_v2');
+          const cachedThreshold = localStorage.getItem('cl_threshold_v2');
+
+          if (cachedClubs && cachedOrders) {
+            setClubs(JSON.parse(cachedClubs));
+            setOrders(JSON.parse(cachedOrders));
+            setPayments(cachedPayments ? JSON.parse(cachedPayments) : []);
+            setFlags(cachedFlags ? JSON.parse(cachedFlags) : []);
+            setAuditLogs(cachedAudit ? JSON.parse(cachedAudit) : []);
+            if (cachedThreshold) setHighValueThreshold(Number(cachedThreshold));
+          } else {
+            // Compute real SHA-256 hashes for all initial clubs
+            const hashedClubs = await Promise.all(INITIAL_CONFIG_CLUBS.map(async (c) => ({
+              ...c,
+              codeHash: await sha256(c.plainCode)
+            })));
+            setClubs(hashedClubs);
+            setOrders(SEED_ORDERS);
+            setPayments(SEED_PAYMENTS);
+            setFlags(SEED_FLAGS);
+            setAuditLogs(SEED_AUDIT);
+            localStorage.setItem('cl_clubs_v2', JSON.stringify(hashedClubs));
+            localStorage.setItem('cl_orders_v2', JSON.stringify(SEED_ORDERS));
+            localStorage.setItem('cl_payments_v2', JSON.stringify(SEED_PAYMENTS));
+            localStorage.setItem('cl_flags_v2', JSON.stringify(SEED_FLAGS));
+            localStorage.setItem('cl_audit_v2', JSON.stringify(SEED_AUDIT));
+          }
+        };
+        initAppData();
+      }, []);
+
+      // Auto-save changes
+      useEffect(() => {
+        if (clubs.length > 0) localStorage.setItem('cl_clubs_v2', JSON.stringify(clubs));
+      }, [clubs]);
+      useEffect(() => {
+        if (orders.length > 0) localStorage.setItem('cl_orders_v2', JSON.stringify(orders));
+      }, [orders]);
+      useEffect(() => {
+        localStorage.setItem('cl_payments_v2', JSON.stringify(payments));
+      }, [payments]);
+      useEffect(() => {
+        localStorage.setItem('cl_flags_v2', JSON.stringify(flags));
+      }, [flags]);
+      useEffect(() => {
+        localStorage.setItem('cl_audit_v2', JSON.stringify(auditLogs));
+      }, [auditLogs]);
+      useEffect(() => {
+        localStorage.setItem('cl_threshold_v2', highValueThreshold.toString());
+      }, [highValueThreshold]);
+
+      // Toast notification helper
+      const showToast = (message, type = 'info') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 4000);
+      };
+
+      // Reset application state to clean seed data
+      const handleResetDemoData = async () => {
+        if (confirm("Reset all ledger records, orders, audit logs, and locks to default demo state?")) {
+          localStorage.clear();
+          const hashedClubs = await Promise.all(INITIAL_CONFIG_CLUBS.map(async (c) => ({
+            ...c,
+            codeHash: await sha256(c.plainCode)
+          })));
+          setClubs(hashedClubs);
+          setOrders(SEED_ORDERS);
+          setPayments(SEED_PAYMENTS);
+          setFlags(SEED_FLAGS);
+          setAuditLogs(SEED_AUDIT);
+          setHighValueThreshold(5000);
+          showToast("Demo data successfully refreshed.", "success");
+        }
+      };
+
+      // -------------------------------------------------------------
+      // AUDIT LOG HELPER (APPEND-ONLY)
+      // -------------------------------------------------------------
+      const appendAudit = (actorName, action, entity, entityId, details) => {
+        const entry = {
+          id: `AUD-${Date.now().toString().slice(-6)}`,
+          actor: actorName,
+          action,
+          entity,
+          entityId,
+          details,
+          timestamp: new Date().toISOString()
+        };
+        setAuditLogs(prev => [entry, ...prev]);
+      };
+
+      // -------------------------------------------------------------
+      // DUPLICATE DETECTION ALGORITHM (3 HEURISTICS)
+      // -------------------------------------------------------------
+      const checkDuplicateHeuristics = (newOrder) => {
+        const normNewBill = normalizeBillNo(newOrder.billNo);
+        const newDate = new Date(newOrder.billDate);
+        const newTotal = Number(newOrder.total);
+        const newItemsStr = newOrder.items.map(i => `${sanitize(i.name).toLowerCase()}:${i.qty}:${i.price}`).sort().join('|');
+
+        for (const o of orders) {
+          // Rule A: Shop Bill Number collision (case/space/symbol insensitive)
+          if (normNewBill && normalizeBillNo(o.billNo) === normNewBill) {
+            return `Duplicate Bill Number: "${newOrder.billNo}" matches existing Order #${o.id} (${o.clubId.toUpperCase()})`;
+          }
+
+          // Rule B: Same club + Same total + Same bill date
+          if (o.clubId === newOrder.clubId && Number(o.total) === newTotal && o.billDate === newOrder.billDate) {
+            return `Identical Expense: Same club (${o.clubId.toUpperCase()}) already submitted bill with identical total of ${formatINR(newTotal)} on ${o.billDate}`;
+          }
+
+          // Rule C: Same club + Same item list + Same total within 3 days
+          if (o.clubId === newOrder.clubId && Number(o.total) === newTotal) {
+            const existingDate = new Date(o.billDate);
+            const diffDays = Math.abs(newDate - existingDate) / (1000 * 60 * 60 * 24);
+            if (diffDays <= 3) {
+              const existingItemsStr = o.items.map(i => `${sanitize(i.name).toLowerCase()}:${i.qty}:${i.price}`).sort().join('|');
+              if (newItemsStr === existingItemsStr) {
+                return `Redundant Purchase: Identical line items and total submitted within 3 days of Order #${o.id}`;
+              }
+            }
+          }
+        }
+        return null;
+      };
+
+      // -------------------------------------------------------------
+      // ORDER CREATION HANDLER
+      // -------------------------------------------------------------
+      const handleCreateOrder = (orderData) => {
+        const newId = `ORD-2026-${String(orders.length + 1).padStart(3, '0')}`;
+        const dupReason = checkDuplicateHeuristics(orderData);
+        const isFlagged = Boolean(dupReason);
+
+        const newOrder = {
+          ...orderData,
+          id: newId,
+          status: 'Awaiting code',
+          flagged: isFlagged,
+          flagReason: dupReason || '',
+          createdAt: new Date().toISOString()
+        };
+
+        setOrders(prev => [newOrder, ...prev]);
+
+        // If duplicate detected, generate security flag entry
+        if (isFlagged) {
+          const newFlag = {
+            id: `FLG-${Date.now().toString().slice(-4)}`,
+            orderId: newId,
+            clubId: orderData.clubId,
+            reason: dupReason,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            reviewedBy: null,
+            reviewedAt: null
+          };
+          setFlags(prev => [newFlag, ...prev]);
+          appendAudit(
+            `${orderData.requestedBy} (Member)`,
+            'DUPLICATE_FLAGGED',
+            'Order',
+            newId,
+            dupReason
+          );
+        }
+
+        appendAudit(
+          `${orderData.requestedBy} (Member)`,
+          'ORDER_CREATED',
+          'Order',
+          newId,
+          `Raised for ${orderData.event} (${formatINR(orderData.total)})${isFlagged ? ' [FLAGGED AS POTENTIAL DUPLICATE]' : ''}`
+        );
+
+        showToast(
+          isFlagged 
+            ? `Order raised with warning: Potential duplicate detected!` 
+            : `Order ${newId} created successfully. Awaiting treasurer authorization.`,
+          isFlagged ? 'warning' : 'success'
+        );
+        setActiveTab('orders');
+      };
+
+      // -------------------------------------------------------------
+      // SECURITY VERIFICATION DISPATCHER
+      // -------------------------------------------------------------
+      const handleOpenAuthModal = (actionType, order, extraData = {}) => {
+        const club = clubs.find(c => c.id === order.clubId);
+        if (!club) return;
+        if (club.locked) {
+          alert(`Club ${club.name} approval authority is LOCKED due to 3 repeated wrong security codes. Contact Faculty Admin to unlock.`);
+          return;
+        }
+
+        setAuthModal({
+          isOpen: true,
+          actionType,
+          targetOrder: order,
+          targetPaymentData: extraData.paymentData || null,
+          targetFlag: extraData.flag || null,
+          decision: extraData.decision || null,
+          inputCode: '',
+          errorMessage: ''
+        });
+      };
+
+      const handleExecuteSecureAction = async (e) => {
+        e.preventDefault();
+        const { actionType, targetOrder, targetPaymentData, targetFlag, decision, inputCode } = authModal;
+        const club = clubs.find(c => c.id === targetOrder.clubId);
+
+        if (!club) return;
+
+        // Perform SHA-256 verification via pluggable security routine
+        const isMatch = await verifyTreasurerCode(club, inputCode);
+
+        if (!isMatch) {
+          const updatedAttempts = (club.failedAttempts || 0) + 1;
+          const isNowLocked = updatedAttempts >= 3;
+          const remaining = 3 - updatedAttempts;
+
+          // Update club lock status in store
+          setClubs(prev => prev.map(c => {
+            if (c.id === club.id) {
+              return {
+                ...c,
+                failedAttempts: updatedAttempts,
+                locked: isNowLocked,
+                status: isNowLocked ? 'locked' : c.status
+              };
+            }
+            return c;
+          }));
+
+          // Log security breach attempt
+          appendAudit(
+            'Security System',
+            isNowLocked ? 'CLUB_LOCKED' : 'FAILED_CODE_ATTEMPT',
+            'Club',
+            club.id,
+            `Failed treasurer code attempt #${updatedAttempts} for ${club.name}. ${isNowLocked ? 'APPROVALS LOCKED! Contact Admin.' : `${remaining} attempts remaining.`}`
+          );
+
+          if (isNowLocked) {
+            setAuthModal(prev => ({ ...prev, isOpen: false }));
+            alert(`SECURITY ALERT: 3 incorrect codes entered. Club "${club.name}" approvals are now LOCKED. Only Faculty Admin can reset this.`);
+          } else {
+            setAuthModal(prev => ({
+              ...prev,
+              errorMessage: `Invalid code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining before lock!`
+            }));
+          }
+          return;
+        }
+
+        // If verification succeeded: Reset failed attempts back to zero
+        setClubs(prev => prev.map(c => c.id === club.id ? { ...c, failedAttempts: 0 } : c));
+
+        // EXECUTE RESPECTIVE ACTION
+        if (actionType === 'authorize') {
+          setOrders(prev => prev.map(o => o.id === targetOrder.id ? { ...o, status: 'Authorized' } : o));
+          appendAudit(
+            `${club.treasurerName} (Treasurer)`,
+            'ORDER_AUTHORIZED',
+            'Order',
+            targetOrder.id,
+            `Authorized purchase order of ${formatINR(targetOrder.total)}`
+          );
+          showToast(`Order ${targetOrder.id} authorized. Added to active ledger.`, 'success');
+        } 
+        else if (actionType === 'reject') {
+          setOrders(prev => prev.map(o => o.id === targetOrder.id ? { ...o, status: 'Rejected' } : o));
+          appendAudit(
+            `${club.treasurerName} (Treasurer)`,
+            'ORDER_REJECTED',
+            'Order',
+            targetOrder.id,
+            `Rejected purchase order of ${formatINR(targetOrder.total)}`
+          );
+          showToast(`Order ${targetOrder.id} rejected.`, 'info');
+        } 
+        else if (actionType === 'record_payment') {
+          const payAmount = Number(targetPaymentData.amount);
+          const payId = `PAY-${Date.now().toString().slice(-4)}`;
+          
+          const newPayment = {
+            id: payId,
+            orderId: targetOrder.id,
+            clubId: targetOrder.clubId,
+            amount: payAmount,
+            mode: targetPaymentData.mode,
+            reference: targetPaymentData.reference || 'N/A',
+            date: targetPaymentData.date,
+            note: targetPaymentData.note || '',
+            recordedBy: club.treasurerName
+          };
+
+          // Compute new status with this payment
+          const existingPaid = payments
+            .filter(p => p.orderId === targetOrder.id)
+            .reduce((sum, p) => sum + p.amount, 0);
+          const totalPaidAfter = existingPaid + payAmount;
+          const nextStatus = totalPaidAfter >= targetOrder.total ? 'Paid' : 'Partially paid';
+
+          setPayments(prev => [newPayment, ...prev]);
+          setOrders(prev => prev.map(o => o.id === targetOrder.id ? { ...o, status: nextStatus } : o));
+          
+          appendAudit(
+            `${club.treasurerName} (Treasurer)`,
+            'PAYMENT_RECORDED',
+            'Payment',
+            payId,
+            `Recorded payment of ${formatINR(payAmount)} for Order #${targetOrder.id} (${nextStatus})`
+          );
+          showToast(`Payment of ${formatINR(payAmount)} recorded. Order status: ${nextStatus}.`, 'success');
+        }
+        else if (actionType === 'review_flag') {
+          // Review flag with treasurer approval
+          setFlags(prev => prev.map(f => f.id === targetFlag.id ? {
+            ...f,
+            status: decision,
+            reviewedBy: `${club.treasurerName} (Treasurer)`,
+            reviewedAt: new Date().toISOString()
+          } : f));
+
+          if (decision === 'confirmed_duplicate') {
+            // Cancel order through reversal entry
+            setOrders(prev => prev.map(o => o.id === targetOrder.id ? { ...o, status: 'Rejected', flagged: true, flagReason: 'Confirmed Duplicate (Voided)' } : o));
+            appendAudit(
+              `${club.treasurerName} (Treasurer)`,
+              'REVERSAL_ENTRY',
+              'Order',
+              targetOrder.id,
+              `Confirmed duplicate flag: voided order total ${formatINR(targetOrder.total)} via reversal.`
+            );
+          } else {
+            appendAudit(
+              `${club.treasurerName} (Treasurer)`,
+              'FLAG_RESOLVED_VALID',
+              'Flag',
+              targetFlag.id,
+              `Flag cleared as valid purchase by treasurer.`
+            );
+          }
+          showToast(`Flag marked as "${decision === 'confirmed_duplicate' ? 'Confirmed Duplicate' : 'Reviewed: Valid'}"`, 'info');
+        }
+
+        setAuthModal(prev => ({ ...prev, isOpen: false, inputCode: '', errorMessage: '' }));
+      };
+
+      // -------------------------------------------------------------
+      // ADMIN UNLOCK ACTION
+      // -------------------------------------------------------------
+      const handleAdminUnlockClub = (clubId) => {
+        const club = clubs.find(c => c.id === clubId);
+        if (!club) return;
+        setClubs(prev => prev.map(c => c.id === clubId ? { ...c, locked: false, failedAttempts: 0, status: 'active' } : c));
+        appendAudit('Faculty Admin', 'CLUB_UNLOCKED', 'Club', clubId, `Reset security lockout for ${club.name}`);
+        showToast(`Security lock cleared for ${club.name}. Approvals re-enabled.`, 'success');
+      };
+
+      // Admin direct flag review (Admin has authority without code)
+      const handleAdminReviewFlag = (flag, decision) => {
+        setFlags(prev => prev.map(f => f.id === flag.id ? {
+          ...f,
+          status: decision,
+          reviewedBy: 'Faculty Coordinator (Admin)',
+          reviewedAt: new Date().toISOString()
+        } : f));
+
+        const order = orders.find(o => o.id === flag.orderId);
+        if (decision === 'confirmed_duplicate' && order) {
+          setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'Rejected', flagReason: 'Confirmed Duplicate by Admin' } : o));
+          appendAudit('Faculty Coordinator (Admin)', 'REVERSAL_ENTRY', 'Order', order.id, `Confirmed duplicate flag: voided order total ${formatINR(order.total)} via reversal.`);
+        } else {
+          appendAudit('Faculty Coordinator (Admin)', 'FLAG_RESOLVED_VALID', 'Flag', flag.id, `Flag cleared as genuine purchase.`);
+        }
+        showToast(`Flag updated to: ${decision}`, 'info');
+      };
+
+      // -------------------------------------------------------------
+      // CSV EXPORT GENERATOR
+      // -------------------------------------------------------------
+      const handleExportCSV = (datasetType) => {
+        let headers = [];
+        let rows = [];
+        let filename = `CampusLedger_${datasetType}_${new Date().toISOString().slice(0, 10)}.csv`;
+
+        if (datasetType === 'orders') {
+          headers = ['Order ID', 'Club', 'Sub-Club', 'Requested By', 'Event', 'Bill No', 'Bill Date', 'Total (INR)', 'Status', 'Flagged'];
+          rows = orders.map(o => [
+            o.id,
+            o.clubId.toUpperCase(),
+            o.subClub || 'N/A',
+            `"${o.requestedBy}"`,
+            `"${o.event}"`,
+            o.billNo,
+            o.billDate,
+            o.total,
+            o.status,
+            o.flagged ? `YES: ${o.flagReason}` : 'NO'
+          ]);
+        } else if (datasetType === 'payments') {
+          headers = ['Payment ID', 'Order ID', 'Club', 'Amount (INR)', 'Mode', 'Reference', 'Date', 'Recorded By'];
+          rows = payments.map(p => [
+            p.id,
+            p.orderId,
+            p.clubId.toUpperCase(),
+            p.amount,
+            p.mode,
+            `"${p.reference}"`,
+            p.date,
+            `"${p.recordedBy}"`
+          ]);
+        }
+
+        const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+      // -------------------------------------------------------------
+      // CALCULATIONS & DERIVED METRICS
+      // -------------------------------------------------------------
+      // Club Ledger calculations (Authorized only count towards spend)
+      const clubLedgers = useMemo(() => {
+        return clubs.map(club => {
+          const clubOrders = orders.filter(o => o.clubId === club.id);
+          const authorizedOrders = clubOrders.filter(o => o.status === 'Authorized' || o.status === 'Partially paid' || o.status === 'Paid');
+          const spent = authorizedOrders.reduce((sum, o) => sum + Number(o.total), 0);
+          
+          const clubPayments = payments.filter(p => p.clubId === club.id);
+          const paid = clubPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+          
+          const pending = Math.max(0, spent - paid);
+          const remaining = club.annualBudget - spent;
+          const percentSpent = club.annualBudget > 0 ? (spent / club.annualBudget) * 100 : 0;
+
+          return {
+            ...club,
+            spent,
+            paid,
+            pending,
+            remaining,
+            percentSpent,
+            authorizedCount: authorizedOrders.length,
+            pendingOrdersCount: clubOrders.filter(o => o.status === 'Awaiting code').length
+          };
+        });
+      }, [clubs, orders, payments]);
+
+      // Global Campus Totals
+      const globalStats = useMemo(() => {
+        const totalBudget = clubs.reduce((acc, c) => acc + c.annualBudget, 0);
+        const totalSpent = clubLedgers.reduce((acc, c) => acc + c.spent, 0);
+        const totalPaid = payments.reduce((acc, p) => acc + p.amount, 0);
+        const totalPendingToShop = Math.max(0, totalSpent - totalPaid);
+        const flaggedCount = flags.filter(f => f.status === 'pending').length;
+        const lockedClubsCount = clubs.filter(c => c.locked).length;
+
+        // Top 5 Spenders
+        const top5Spenders = [...clubLedgers].sort((a, b) => b.spent - a.spent).slice(0, 5);
+
+        return {
+          totalBudget,
+          totalSpent,
+          totalPaid,
+          totalPendingToShop,
+          flaggedCount,
+          lockedClubsCount,
+          top5Spenders
+        };
+      }, [clubs, clubLedgers, payments, flags]);
+
+      // Filtered orders based on selected role
+      const visibleOrders = useMemo(() => {
+        if (role === 'treasurer') {
+          return orders.filter(o => o.clubId === selectedTreasurerClubId);
+        }
+        return orders;
+      }, [orders, role, selectedTreasurerClubId]);
+
+      // Active Treasurer Club object
+      const currentTreasurerClub = useMemo(() => {
+        return clubs.find(c => c.id === selectedTreasurerClubId);
+      }, [clubs, selectedTreasurerClubId]);
+
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
+          
+          {/* TOAST ALERTS */}
+          {toast && (
+            <div className="fixed top-4 right-4 z-50 transition-all transform animate-bounce">
+              <div className={`px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 text-sm font-medium ${
+                toast.type === 'success' ? 'bg-emerald-600 text-white' :
+                toast.type === 'warning' ? 'bg-amber-500 text-slate-950' :
+                toast.type === 'error' ? 'bg-rose-600 text-white' : 'bg-slate-800 text-white'
+              }`}>
+                <span>{toast.message}</span>
+              </div>
+            </div>
+          )}
+
+          {/* APP HEADER & ROLE SWITCHER */}
+          <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm no-print">
+            <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold shadow-md">
+                    CL
+                  </div>
+                  <div>
+                    <h1 className="text-lg font-bold text-slate-900 leading-tight">Campus Ledger</h1>
+                    <p className="text-xs text-slate-500">Designated Stationery & Eatables Shop Portal</p>
+                  </div>
+                </div>
+
+                {/* Mobile Reset & Demo Toggle */}
+                <div className="flex md:hidden items-center space-x-2">
+                  <button 
+                    onClick={handleResetDemoData}
+                    className="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700"
+                    title="Reset all demo data"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              {/* Role Selector Controls */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center bg-slate-100 p-1 rounded-lg text-xs font-medium">
+                  <span className="text-slate-500 px-2 font-semibold">Role:</span>
+                  {[
+                    { id: 'member', label: 'Club Member' },
+                    { id: 'treasurer', label: 'Treasurer' },
+                    { id: 'shopkeeper', label: 'Shopkeeper' },
+                    { id: 'admin', label: 'Faculty / Admin' }
+                  ].map(r => (
+                    <button
+                      key={r.id}
+                      onClick={() => setRole(r.id)}
+                      className={`px-2.5 py-1 rounded-md transition-all ${
+                        role === r.id 
+                          ? 'bg-white text-indigo-700 shadow-sm font-bold' 
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* If Treasurer role is active, show club picker */}
+                {role === 'treasurer' && (
+                  <div className="flex items-center space-x-1.5 bg-indigo-50 border border-indigo-200 px-2 py-1 rounded-lg">
+                    <label htmlFor="treasurerClubSelect" className="text-xs text-indigo-800 font-semibold">Club:</label>
+                    <select
+                      id="treasurerClubSelect"
+                      value={selectedTreasurerClubId}
+                      onChange={(e) => setSelectedTreasurerClubId(e.target.value)}
+                      className="text-xs bg-transparent font-medium text-indigo-900 focus:outline-none"
+                    >
+                      {clubs.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.locked ? '🔒 (LOCKED)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Demo Helper: Show Plain Codes */}
+                <button
+                  onClick={() => setDemoShowCodes(!demoShowCodes)}
+                  className={`text-xs px-2.5 py-1.5 rounded-lg border transition flex items-center space-x-1 ${
+                    demoShowCodes 
+                      ? 'bg-amber-100 border-amber-300 text-amber-900 font-medium' 
+                      : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'
+                  }`}
+                  title="Toggle visible passcodes for testing ease"
+                >
+                  <span>{demoShowCodes ? '🔓 Hide Demo Codes' : '🔑 Demo Mode: Show Codes'}</span>
+                </button>
+
+                <button 
+                  onClick={handleResetDemoData}
+                  className="hidden md:inline-flex text-xs px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200"
+                >
+                  Reset Demo
+                </button>
+              </div>
+            </div>
+
+            {/* DEMO CODES BANNER (When Enabled) */}
+            {demoShowCodes && (
+              <div className="bg-amber-50 border-t border-b border-amber-200 px-4 py-2 text-xs text-amber-900 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="font-bold">🔑 Test Passcodes:</span>
+                {role === 'treasurer' && currentTreasurerClub ? (
+                  <span>
+                    Current Club (<strong>{currentTreasurerClub.name}</strong>): code is <code className="bg-amber-200 px-1 py-0.5 rounded font-mono font-bold text-amber-950">{currentTreasurerClub.plainCode}</code>
+                  </span>
+                ) : (
+                  <span>
+                    AIMSA: <code>1111</code> | CESA: <code>2222</code> | IEEE: <code>9999</code> | GDGC: <code>1212</code> | Automatons: <code>4545</code>
+                  </span>
+                )}
+                <span className="text-amber-700 italic ml-auto">(Stored as SHA-256 in store; simulated via Web Crypto)</span>
+              </div>
+            )}
+          </header>
+
+          {/* MAIN WORKSPACE LAYOUT */}
+          <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 flex flex-col md:flex-row gap-6">
+            
+            {/* SIDEBAR NAVIGATION (Desktop) */}
+            <aside className="w-full md:w-56 shrink-0 hidden md:block no-print">
+              <nav className="sticky top-20 space-y-1 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Menu
+                </div>
+
+                <button
+                  onClick={() => setActiveTab('orders')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg font-medium transition ${
+                    activeTab === 'orders' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>📦 Orders & Bills</span>
+                  <span className="text-xs bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-full">{orders.length}</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('new-order')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg font-medium transition ${
+                    activeTab === 'new-order' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>✍️ New Purchase PO</span>
+                  <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold">+</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('clubs')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg font-medium transition ${
+                    activeTab === 'clubs' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>🏛️ Club Ledgers</span>
+                  <span className="text-xs text-slate-400">{clubs.length}</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('payments')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg font-medium transition ${
+                    activeTab === 'payments' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>💳 Payments Record</span>
+                  <span className="text-xs bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full">{payments.length}</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('flags')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg font-medium transition ${
+                    activeTab === 'flags' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>🚩 Flags & Anti-Fraud</span>
+                  {flags.filter(f => f.status === 'pending').length > 0 && (
+                    <span className="text-xs bg-rose-500 text-white px-2 py-0.5 rounded-full font-bold">
+                      {flags.filter(f => f.status === 'pending').length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('reports')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg font-medium transition ${
+                    activeTab === 'reports' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>📊 Reports & Dues</span>
+                </button>
+
+                {role === 'admin' && (
+                  <button
+                    onClick={() => setActiveTab('audit')}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg font-medium transition ${
+                      activeTab === 'audit' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>🛡️ Audit Trail</span>
+                    <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-mono">{auditLogs.length}</span>
+                  </button>
+                )}
+              </nav>
+
+              {/* CURRENT ROLE HIGHLIGHT BANNER */}
+              <div className="mt-4 p-3 bg-white rounded-xl border border-slate-200 text-xs text-slate-600 space-y-1">
+                <div className="font-semibold text-slate-800">Current Session:</div>
+                <div className="capitalize font-medium text-indigo-600">{role === 'admin' ? 'Faculty Admin' : role}</div>
+                {role === 'treasurer' && currentTreasurerClub && (
+                  <div className="text-slate-500 mt-1">
+                    Rep: {currentTreasurerClub.treasurerName}<br/>
+                    Budget left: <span className="font-semibold text-slate-800">{formatINR(currentTreasurerClub.annualBudget - (clubLedgers.find(l => l.id === currentTreasurerClub.id)?.spent || 0))}</span>
+                  </div>
+                )}
+                {role === 'shopkeeper' && (
+                  <div className="text-slate-500 mt-1">
+                    Receivable: <span className="font-semibold text-emerald-600">{formatINR(globalStats.totalPendingToShop)}</span>
+                  </div>
+                )}
+              </div>
+            </aside>
+
+            {/* MAIN CONTENT VIEW AREA */}
+            <main className="flex-1 min-w-0">
+              
+              {/* TAB 1: ORDERS & BILLS */}
+              {activeTab === 'orders' && (
+                <OrdersView
+                  orders={visibleOrders}
+                  clubs={clubs}
+                  payments={payments}
+                  role={role}
+                  selectedTreasurerClubId={selectedTreasurerClubId}
+                  highValueThreshold={highValueThreshold}
+                  onOpenAuthModal={handleOpenAuthModal}
+                  onPrintOrder={(ord) => setPrintPreview({ type: 'order', data: ord })}
+                  onExportCSV={() => handleExportCSV('orders')}
+                  onGoToNewOrder={() => setActiveTab('new-order')}
+                />
+              )}
+
+              {/* TAB 2: NEW PURCHASE ORDER FORM */}
+              {activeTab === 'new-order' && (
+                <NewOrderForm
+                  clubs={clubs}
+                  onSubmitOrder={handleCreateOrder}
+                  onCancel={() => setActiveTab('orders')}
+                />
+              )}
+
+              {/* TAB 3: CLUBS & BUDGET LEDGER */}
+              {activeTab === 'clubs' && (
+                <ClubsLedgerView
+                  ledgers={clubLedgers}
+                  role={role}
+                  onUnlockClub={handleAdminUnlockClub}
+                  onPrintClubStatement={(clubLedger) => setPrintPreview({ type: 'club', data: clubLedger })}
+                />
+              )}
+
+              {/* TAB 4: PAYMENTS RECORD */}
+              {activeTab === 'payments' && (
+                <PaymentsListView
+                  payments={payments}
+                  orders={orders}
+                  clubs={clubs}
+                  role={role}
+                  selectedTreasurerClubId={selectedTreasurerClubId}
+                  onExportCSV={() => handleExportCSV('payments')}
+                />
+              )}
+
+              {/* TAB 5: FLAGS & ANTI-FRAUD */}
+              {activeTab === 'flags' && (
+                <FlagsSecurityView
+                  flags={flags}
+                  orders={orders}
+                  clubs={clubs}
+                  role={role}
+                  selectedTreasurerClubId={selectedTreasurerClubId}
+                  onOpenAuthModal={handleOpenAuthModal}
+                  onAdminReviewFlag={handleAdminReviewFlag}
+                  onAdminUnlockClub={handleAdminUnlockClub}
+                />
+              )}
+
+              {/* TAB 6: REPORTS & INSIGHTS */}
+              {activeTab === 'reports' && (
+                <ReportsView
+                  globalStats={globalStats}
+                  clubLedgers={clubLedgers}
+                  orders={orders}
+                  role={role}
+                  highValueThreshold={highValueThreshold}
+                  onUpdateThreshold={setHighValueThreshold}
+                />
+              )}
+
+              {/* TAB 7: AUDIT LOG (ADMIN EXCLUSIVE) */}
+              {activeTab === 'audit' && (
+                <AuditTrailView
+                  auditLogs={auditLogs}
+                  clubs={clubs}
+                />
+              )}
+
+            </main>
+          </div>
+
+          {/* MOBILE BOTTOM NAVIGATION */}
+          <nav id="bottom-nav" className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 flex justify-around items-center px-1 py-2 text-xs">
+            <button
+              onClick={() => setActiveTab('orders')}
+              className={`flex flex-col items-center py-1 px-2 ${activeTab === 'orders' ? 'text-indigo-600 font-bold' : 'text-slate-500'}`}
+            >
+              <span>📦</span>
+              <span>Orders</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('new-order')}
+              className={`flex flex-col items-center py-1 px-2 ${activeTab === 'new-order' ? 'text-indigo-600 font-bold' : 'text-slate-500'}`}
+            >
+              <span>✍️</span>
+              <span>New PO</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('clubs')}
+              className={`flex flex-col items-center py-1 px-2 ${activeTab === 'clubs' ? 'text-indigo-600 font-bold' : 'text-slate-500'}`}
+            >
+              <span>🏛️</span>
+              <span>Clubs</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('payments')}
+              className={`flex flex-col items-center py-1 px-2 ${activeTab === 'payments' ? 'text-indigo-600 font-bold' : 'text-slate-500'}`}
+            >
+              <span>💳</span>
+              <span>Pay</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('flags')}
+              className={`flex flex-col items-center py-1 px-2 relative ${activeTab === 'flags' ? 'text-indigo-600 font-bold' : 'text-slate-500'}`}
+            >
+              <span>🚩</span>
+              <span>Flags</span>
+              {flags.filter(f => f.status === 'pending').length > 0 && (
+                <span className="absolute top-0 right-1 w-2 h-2 bg-rose-500 rounded-full"></span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('reports')}
+              className={`flex flex-col items-center py-1 px-2 ${activeTab === 'reports' ? 'text-indigo-600 font-bold' : 'text-slate-500'}`}
+            >
+              <span>📊</span>
+              <span>Stats</span>
+            </button>
+          </nav>
+
+          {/* ========================================================= */}
+          {/* SECURITY AUTHORIZATION MODAL (TREASURER CODE VERIFICATION) */}
+          {/* ========================================================= */}
+          {authModal.isOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm modal-backdrop">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center space-x-2">
+                    <span className="p-2 bg-indigo-50 text-indigo-600 rounded-lg text-lg">🔐</span>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">
+                        {authModal.actionType === 'authorize' && 'Authorize Purchase Order'}
+                        {authModal.actionType === 'reject' && 'Reject Purchase Order'}
+                        {authModal.actionType === 'record_payment' && 'Confirm Payment Record'}
+                        {authModal.actionType === 'review_flag' && 'Verify Duplicate Flag Resolution'}
+                      </h3>
+                      <p className="text-xs text-slate-500">Security check for {clubs.find(c => c.id === authModal.targetOrder?.clubId)?.name}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setAuthModal(prev => ({ ...prev, isOpen: false }))}
+                    className="text-slate-400 hover:text-slate-600 text-xl font-bold"
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <div className="my-4 bg-slate-50 p-3 rounded-lg text-xs space-y-1.5 border border-slate-100">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Target Order:</span>
+                    <span className="font-semibold text-slate-800">{authModal.targetOrder?.id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Event / Bill:</span>
+                    <span className="text-slate-800">{authModal.targetOrder?.event} (Bill #{authModal.targetOrder?.billNo})</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Order Amount:</span>
+                    <span className="font-bold text-indigo-700">{formatINR(authModal.targetOrder?.total)}</span>
+                  </div>
+                  {authModal.targetPaymentData && (
+                    <div className="flex justify-between border-t border-slate-200 pt-1 text-emerald-700">
+                      <span>Payment to log:</span>
+                      <span className="font-bold">{formatINR(authModal.targetPaymentData.amount)} ({authModal.targetPaymentData.mode})</span>
+                    </div>
+                  )}
+                </div>
+
+                <form onSubmit={handleExecuteSecureAction} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Enter Private Treasurer Passcode
+                    </label>
+                    <input
+                      type="password"
+                      autoFocus
+                      maxLength={8}
+                      placeholder="••••"
+                      value={authModal.inputCode}
+                      onChange={(e) => setAuthModal(prev => ({ ...prev, inputCode: e.target.value, errorMessage: '' }))}
+                      className="w-full text-center tracking-widest text-2xl font-mono px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1 text-center">
+                      Only authorized treasurer for this club can sign this transaction.
+                    </p>
+                  </div>
+
+                  {authModal.errorMessage && (
+                    <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium">
+                      ⚠️ {authModal.errorMessage}
+                    </div>
+                  )}
+
+                  <div className="flex space-x-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setAuthModal(prev => ({ ...prev, isOpen: false }))}
+                      className="flex-1 py-2 px-3 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!authModal.inputCode.trim()}
+                      className="flex-1 py-2 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-sm"
+                    >
+                      Verify & Execute
+                    </button>
+                  </div>
+                </form>
+
+                {/* Developer note highlighting pluggable code check */}
+                <div className="mt-4 pt-3 border-t border-slate-100 text-[10px] text-slate-400 text-center">
+                  🛡️ SHA-256 hashed locally. Pluggable architecture ready for WhatsApp / SMS OTP verification.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* PRINTABLE BILL / STATEMENT MODAL */}
+          {/* ========================================================= */}
+          {printPreview && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
+              <div className="bg-white rounded-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto print-card">
+                
+                <div className="flex justify-between items-center mb-6 no-print border-b pb-3">
+                  <h3 className="font-bold text-slate-800">Print Preview</h3>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => window.print()}
+                      className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg shadow hover:bg-indigo-700"
+                    >
+                      🖨️ Print to PDF / Paper
+                    </button>
+                    <button
+                      onClick={() => setPrintPreview(null)}
+                      className="px-3 py-1.5 border border-slate-300 text-xs font-semibold rounded-lg text-slate-700"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+
+                {/* Printable Order Bill */}
+                {printPreview.type === 'order' && (
+                  <div className="space-y-4 text-slate-800 text-sm">
+                    <div className="border-b pb-4 text-center">
+                      <h2 className="text-xl font-bold uppercase tracking-wide">Campus Designated Stationery & Eatables Shop</h2>
+                      <p className="text-xs text-slate-500">Official Purchase Order & Billing Voucher</p>
+                      <p className="text-xs font-mono mt-1">Order Ref: {printPreview.data.id} | Shop Bill: {printPreview.data.billNo}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <p className="text-slate-500">Club / Department:</p>
+                        <p className="font-bold text-slate-900">{clubs.find(c => c.id === printPreview.data.clubId)?.name}</p>
+                        {printPreview.data.subClub && <p className="text-slate-600">Sub-club: {printPreview.data.subClub}</p>}
+                        <p className="mt-1 text-slate-500">Requested By: <span className="font-semibold text-slate-900">{printPreview.data.requestedBy}</span></p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-slate-500">Bill Date: <span className="font-semibold text-slate-800">{printPreview.data.billDate}</span></p>
+                        <p className="text-slate-500">Event: <span className="font-semibold text-slate-800">{printPreview.data.event}</span></p>
+                        <p className="mt-1 text-slate-500">Authorization: <span className="font-bold text-indigo-700 uppercase">{printPreview.data.status}</span></p>
+                      </div>
+                    </div>
+
+                    <table className="w-full text-left text-xs border border-slate-200 mt-4">
+                      <thead className="bg-slate-100 border-b border-slate-200">
+                        <tr>
+                          <th className="p-2">Item Description</th>
+                          <th className="p-2 text-center">Qty</th>
+                          <th className="p-2 text-right">Unit Price</th>
+                          <th className="p-2 text-right">Line Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {printPreview.data.items.map((item, idx) => (
+                          <tr key={idx}>
+                            <td className="p-2">{item.name}</td>
+                            <td className="p-2 text-center">{item.qty}</td>
+                            <td className="p-2 text-right">{formatINR(item.price)}</td>
+                            <td className="p-2 text-right font-medium">{formatINR(item.qty * item.price)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
+                        <tr>
+                          <td colSpan={3} className="p-2 text-right">Grand Total:</td>
+                          <td className="p-2 text-right text-indigo-700 text-sm">{formatINR(printPreview.data.total)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+
+                    <div className="mt-8 pt-4 border-t grid grid-cols-2 gap-8 text-[11px] text-center text-slate-500">
+                      <div>
+                        <div className="h-12 border-b border-slate-300"></div>
+                        <p className="mt-1">Club Treasurer Signature / Code Auth</p>
+                      </div>
+                      <div>
+                        <div className="h-12 border-b border-slate-300"></div>
+                        <p className="mt-1">Shopkeeper Acknowledgement & Seal</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Printable Club Statement */}
+                {printPreview.type === 'club' && (
+                  <div className="space-y-4 text-slate-800 text-sm">
+                    <div className="border-b pb-4 text-center">
+                      <h2 className="text-xl font-bold uppercase tracking-wide">Campus Finance Office - Ledger Statement</h2>
+                      <p className="text-xs text-slate-500">{printPreview.data.name}</p>
+                      <p className="text-xs font-mono mt-1">Generated: {new Date().toLocaleDateString('en-IN')}</p>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-lg border text-xs text-center">
+                      <div>
+                        <span className="text-slate-500">Total Budget:</span>
+                        <div className="font-bold text-slate-900">{formatINR(printPreview.data.annualBudget)}</div>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Authorized Spend:</span>
+                        <div className="font-bold text-indigo-600">{formatINR(printPreview.data.spent)}</div>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Remaining Budget:</span>
+                        <div className="font-bold text-emerald-600">{formatINR(printPreview.data.remaining)}</div>
+                      </div>
+                    </div>
+
+                    <h4 className="font-bold text-xs uppercase text-slate-600 mt-4">Purchase History</h4>
+                    <table className="w-full text-left text-xs border border-slate-200">
+                      <thead className="bg-slate-100 border-b">
+                        <tr>
+                          <th className="p-2">Order ID</th>
+                          <th className="p-2">Date</th>
+                          <th className="p-2">Event</th>
+                          <th className="p-2">Bill No</th>
+                          <th className="p-2 text-right">Amount</th>
+                          <th className="p-2 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {orders.filter(o => o.clubId === printPreview.data.id).map(o => (
+                          <tr key={o.id}>
+                            <td className="p-2 font-mono">{o.id}</td>
+                            <td className="p-2">{o.billDate}</td>
+                            <td className="p-2">{o.event}</td>
+                            <td className="p-2">{o.billNo}</td>
+                            <td className="p-2 text-right font-medium">{formatINR(o.total)}</td>
+                            <td className="p-2 text-center">{o.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // SECTION 4: SUB-VIEWS & MODULAR COMPONENTS
+    // =========================================================================
+
+    // -------------------------------------------------------------
+    // 4.1: ORDERS LIST VIEW & PAYMENT MODAL DISPATCH
+    // -------------------------------------------------------------
+    function OrdersView({ 
+      orders, 
+      clubs, 
+      payments, 
+      role, 
+      selectedTreasurerClubId, 
+      highValueThreshold,
+      onOpenAuthModal, 
+      onPrintOrder, 
+      onExportCSV,
+      onGoToNewOrder 
+    }) {
+      const [filterStatus, setFilterStatus] = useState('all');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [selectedClubFilter, setSelectedClubFilter] = useState('all');
+      const [paymentModalOrder, setPaymentModalOrder] = useState(null);
+
+      // Payment Modal Form State
+      const [paymentForm, setPaymentForm] = useState({
+        amount: '',
+        mode: 'UPI',
+        reference: '',
+        date: new Date().toISOString().slice(0, 10),
+        note: '',
+        error: ''
+      });
+
+      const filteredOrders = useMemo(() => {
+        return orders.filter(o => {
+          if (filterStatus !== 'all' && o.status !== filterStatus) return false;
+          if (role !== 'treasurer' && selectedClubFilter !== 'all' && o.clubId !== selectedClubFilter) return false;
+          if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            const clubName = (clubs.find(c => c.id === o.clubId)?.name || '').toLowerCase();
+            const matchesText = o.id.toLowerCase().includes(q) ||
+                                o.billNo.toLowerCase().includes(q) ||
+                                o.event.toLowerCase().includes(q) ||
+                                o.requestedBy.toLowerCase().includes(q) ||
+                                clubName.includes(q);
+            if (!matchesText) return false;
+          }
+          return true;
+        });
+      }, [orders, filterStatus, selectedClubFilter, searchQuery, clubs, role]);
+
+      // Calculate paid amount per order
+      const getOrderPaymentSummary = (orderId) => {
+        const orderPays = payments.filter(p => p.orderId === orderId);
+        const totalPaid = orderPays.reduce((sum, p) => sum + p.amount, 0);
+        return { totalPaid, count: orderPays.length };
+      };
+
+      const handleStartPayment = (order) => {
+        const { totalPaid } = getOrderPaymentSummary(order.id);
+        const balance = Math.max(0, order.total - totalPaid);
+        setPaymentForm({
+          amount: balance.toString(),
+          mode: 'UPI',
+          reference: '',
+          date: new Date().toISOString().slice(0, 10),
+          note: '',
+          error: ''
+        });
+        setPaymentModalOrder(order);
+      };
+
+      const handleSubmitPaymentForm = (e) => {
+        e.preventDefault();
+        const amt = Number(paymentForm.amount);
+        const { totalPaid } = getOrderPaymentSummary(paymentModalOrder.id);
+        const balance = paymentModalOrder.total - totalPaid;
+
+        if (isNaN(amt) || amt <= 0) {
+          setPaymentForm(prev => ({ ...prev, error: 'Please enter a valid positive payment amount.' }));
+          return;
+        }
+        if (amt > balance) {
+          setPaymentForm(prev => ({ ...prev, error: `Overpayment rejected! Maximum outstanding balance is ${formatINR(balance)}.` }));
+          return;
+        }
+
+        // Open secure authorization modal for treasurer pass-code verification
+        onOpenAuthModal('record_payment', paymentModalOrder, { paymentData: paymentForm });
+        setPaymentModalOrder(null);
+      };
+
+      return (
+        <div className="space-y-4">
+          
+          {/* Header Banner & Filters */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Purchase Orders & Bills</h2>
+              <p className="text-xs text-slate-500">
+                {role === 'treasurer' 
+                  ? `Showing orders strictly for ${clubs.find(c => c.id === selectedTreasurerClubId)?.name}` 
+                  : 'Centralized registry of all department & community expense requests'}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={onExportCSV}
+                className="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-300 flex items-center space-x-1"
+              >
+                <span>📥 Export CSV</span>
+              </button>
+              <button
+                onClick={onGoToNewOrder}
+                className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm flex items-center space-x-1"
+              >
+                <span>+ Raise New PO</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Search & Filter Controls */}
+          <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by Bill #, PO ID, Club, Event, or Name..."
+                className="w-full text-xs pl-8 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              />
+              <span className="absolute left-2.5 top-2.5 text-slate-400 text-xs">🔍</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {role !== 'treasurer' && (
+                <select
+                  value={selectedClubFilter}
+                  onChange={(e) => setSelectedClubFilter(e.target.value)}
+                  className="text-xs py-2 px-2.5 border border-slate-300 rounded-lg bg-white text-slate-700 focus:outline-none"
+                >
+                  <option value="all">All Clubs ({clubs.length})</option>
+                  {clubs.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              )}
+
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="text-xs py-2 px-2.5 border border-slate-300 rounded-lg bg-white text-slate-700 focus:outline-none"
+              >
+                <option value="all">All Statuses</option>
+                <option value="Awaiting code">Awaiting Code</option>
+                <option value="Authorized">Authorized (Pending Pay)</option>
+                <option value="Partially paid">Partially Paid</option>
+                <option value="Paid">Paid in Full</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
+
+          {/* ORDERS TABLE / CARD FEED */}
+          {filteredOrders.length === 0 ? (
+            <div className="bg-white p-8 rounded-xl border border-slate-200 text-center space-y-2">
+              <span className="text-3xl">📭</span>
+              <h3 className="text-sm font-bold text-slate-700">No matching orders found</h3>
+              <p className="text-xs text-slate-400">Try adjusting your filters or search terms.</p>
+              <button
+                onClick={onGoToNewOrder}
+                className="mt-2 text-xs font-semibold text-indigo-600 hover:underline"
+              >
+                Raise a new order now &rarr;
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredOrders.map(order => {
+                const club = clubs.find(c => c.id === order.clubId);
+                const { totalPaid } = getOrderPaymentSummary(order.id);
+                const balance = Math.max(0, order.total - totalPaid);
+                const isHighValue = order.total >= highValueThreshold;
+
+                return (
+                  <div 
+                    key={order.id} 
+                    className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:border-slate-300 transition space-y-3"
+                  >
+                    {/* Header Row */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                      <div className="flex items-center space-x-2 flex-wrap">
+                        <span className="font-mono font-bold text-xs bg-slate-100 text-slate-800 px-2 py-0.5 rounded">
+                          {order.id}
+                        </span>
+                        <span className="text-xs font-bold text-slate-900">{club?.name}</span>
+                        {order.subClub && (
+                          <span className="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                            {order.subClub}
+                          </span>
+                        )}
+
+                        {/* STATUS BADGE */}
+                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                          order.status === 'Paid' ? 'bg-emerald-100 text-emerald-800' :
+                          order.status === 'Partially paid' ? 'bg-amber-100 text-amber-800' :
+                          order.status === 'Authorized' ? 'bg-blue-100 text-blue-800' :
+                          order.status === 'Rejected' ? 'bg-rose-100 text-rose-800' :
+                          'bg-slate-200 text-slate-700'
+                        }`}>
+                          {order.status === 'Authorized' ? 'Authorized (Pending Pay)' : order.status}
+                        </span>
+
+                        {/* HIGH VALUE ANOMALY BADGE */}
+                        {isHighValue && (
+                          <span className="text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200 px-1.5 py-0.5 rounded uppercase">
+                            ⚠️ High value (&gt; {formatINR(highValueThreshold)})
+                          </span>
+                        )}
+
+                        {/* DUPLICATE WARNING BADGE */}
+                        {order.flagged && (
+                          <span className="text-[10px] font-bold bg-rose-600 text-white px-1.5 py-0.5 rounded uppercase">
+                            Flagged Duplicate
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-xs text-slate-400">
+                        Bill Date: <strong className="text-slate-700">{order.billDate}</strong> | Bill #{' '}
+                        <strong className="text-slate-800">{order.billNo}</strong>
+                      </div>
+                    </div>
+
+                    {/* Duplicate alert message if flagged */}
+                    {order.flagged && (
+                      <div className="bg-rose-50 border border-rose-200 rounded-lg p-2 text-xs text-rose-700 flex items-start space-x-2">
+                        <span>🚨</span>
+                        <div>
+                          <strong>Duplicate Warning:</strong> {order.flagReason}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Middle Details: Event & Items summary */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <span className="text-slate-400 block">Event / Purpose:</span>
+                        <span className="font-semibold text-slate-800">{order.event}</span>
+                        <span className="text-slate-500 block text-[11px] mt-0.5">Requested by: {order.requestedBy}</span>
+                      </div>
+
+                      <div>
+                        <span className="text-slate-400 block">Line Items ({order.items.length}):</span>
+                        <ul className="text-slate-600 space-y-0.5 text-[11px]">
+                          {order.items.slice(0, 2).map((item, idx) => (
+                            <li key={idx}>• {item.name} ({item.qty} × {formatINR(item.price)})</li>
+                          ))}
+                          {order.items.length > 2 && (
+                            <li className="text-slate-400 italic">+{order.items.length - 2} more item(s)...</li>
+                          )}
+                        </ul>
+                      </div>
+
+                      <div className="md:text-right">
+                        <span className="text-slate-400 block">Bill Total:</span>
+                        <span className="text-base font-extrabold text-indigo-700">{formatINR(order.total)}</span>
+                        
+                        {(order.status === 'Partially paid' || order.status === 'Paid') && (
+                          <div className="text-[11px] mt-1 space-y-0.5">
+                            <span className="text-emerald-700 font-semibold block">Paid: {formatINR(totalPaid)}</span>
+                            {balance > 0 && <span className="text-amber-700 font-semibold block">Due: {formatINR(balance)}</span>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bottom Action Footer */}
+                    <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                      <button
+                        onClick={() => onPrintOrder(order)}
+                        className="text-xs text-slate-500 hover:text-slate-800 font-medium flex items-center space-x-1"
+                      >
+                        <span>🖨️ View / Print Voucher</span>
+                      </button>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* TREASURER APPROVAL CONTROLS */}
+                        {role === 'treasurer' && order.clubId === selectedTreasurerClubId && order.status === 'Awaiting code' && (
+                          <>
+                            <button
+                              onClick={() => onOpenAuthModal('reject', order)}
+                              className="px-2.5 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200"
+                            >
+                              Reject PO
+                            </button>
+                            <button
+                              onClick={() => onOpenAuthModal('authorize', order)}
+                              className="px-3 py-1 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm"
+                            >
+                              Authorize with Code &rarr;
+                            </button>
+                          </>
+                        )}
+
+                        {/* PAYMENT RECORDING (Available to Treasurer & Shopkeeper for authorized orders) */}
+                        {(order.status === 'Authorized' || order.status === 'Partially paid') && (
+                          <button
+                            onClick={() => handleStartPayment(order)}
+                            className="px-3 py-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm flex items-center space-x-1"
+                          >
+                            <span>💳 Record Payment ({formatINR(balance)} due)</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* RECORD PAYMENT MODAL (Step 1: Details entry) */}
+          {/* ========================================================= */}
+          {paymentModalOrder && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <h3 className="text-base font-bold text-slate-900">Record Payment for {paymentModalOrder.id}</h3>
+                  <button 
+                    onClick={() => setPaymentModalOrder(null)}
+                    className="text-slate-400 hover:text-slate-600 text-xl font-bold"
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <form onSubmit={handleSubmitPaymentForm} className="space-y-3 mt-4 text-xs">
+                  <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                    <div className="flex justify-between text-slate-600">
+                      <span>Order Total:</span>
+                      <strong>{formatINR(paymentModalOrder.total)}</strong>
+                    </div>
+                    <div className="flex justify-between text-slate-600 mt-1">
+                      <span>Already Settled:</span>
+                      <strong className="text-emerald-700">
+                        {formatINR(getOrderPaymentSummary(paymentModalOrder.id).totalPaid)}
+                      </strong>
+                    </div>
+                    <div className="flex justify-between text-slate-800 font-bold border-t pt-1 mt-1">
+                      <span>Remaining Balance:</span>
+                      <strong className="text-indigo-700">
+                        {formatINR(paymentModalOrder.total - getOrderPaymentSummary(paymentModalOrder.id).totalPaid)}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Amount to Pay (INR) *</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={paymentModalOrder.total - getOrderPaymentSummary(paymentModalOrder.id).totalPaid}
+                      value={paymentForm.amount}
+                      onChange={(e) => setPaymentForm(prev => ({ ...prev, amount: e.target.value, error: '' }))}
+                      className="w-full px-3 py-2 border rounded-lg font-bold text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-0.5">Supports partial installments. Rejects any amount exceeding remaining balance.</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Payment Mode *</label>
+                      <select
+                        value={paymentForm.mode}
+                        onChange={(e) => setPaymentForm(prev => ({ ...prev, mode: e.target.value }))}
+                        className="w-full px-2 py-2 border rounded-lg bg-white"
+                      >
+                        <option value="UPI">UPI (GPay / PhonePe)</option>
+                        <option value="Cash">Cash at Shop</option>
+                        <option value="Bank transfer">Bank / NEFT / IMPS</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Payment Date *</label>
+                      <input
+                        type="date"
+                        required
+                        value={paymentForm.date}
+                        onChange={(e) => setPaymentForm(prev => ({ ...prev, date: e.target.value }))}
+                        className="w-full px-2 py-2 border rounded-lg bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Reference / UTR / Receipt No. *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. UPI/20260928/18294 or CASH-REC-09"
+                      value={paymentForm.reference}
+                      onChange={(e) => setPaymentForm(prev => ({ ...prev, reference: e.target.value }))}
+                      className="w-full px-3 py-2 border rounded-lg font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Notes (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 50% advance clearance"
+                      value={paymentForm.note}
+                      onChange={(e) => setPaymentForm(prev => ({ ...prev, note: e.target.value }))}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    />
+                  </div>
+
+                  {paymentForm.error && (
+                    <div className="p-2 bg-rose-50 text-rose-700 border border-rose-200 rounded font-semibold">
+                      ⚠️ {paymentForm.error}
+                    </div>
+                  )}
+
+                  <div className="flex space-x-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentModalOrder(null)}
+                      className="flex-1 py-2 border rounded-lg font-semibold text-slate-700"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow"
+                    >
+                      Next: Verify Passcode &rarr;
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // 4.2: NEW PURCHASE ORDER FORM
+    // -------------------------------------------------------------
+    function NewOrderForm({ clubs, onSubmitOrder, onCancel }) {
+      const [clubId, setClubId] = useState(clubs[0]?.id || 'aimsa');
+      const [subClub, setSubClub] = useState('');
+      const [requestedBy, setRequestedBy] = useState('');
+      const [event, setEvent] = useState('');
+      const [billNo, setBillNo] = useState('');
+      const [billDate, setBillDate] = useState(new Date().toISOString().slice(0, 10));
+      
+      const [items, setItems] = useState([
+        { name: 'Chart Paper & Pins', qty: 10, price: 20 },
+        { name: 'Tea & Refreshment Pack', qty: 25, price: 35 }
+      ]);
+
+      const [errors, setErrors] = useState({});
+
+      const selectedClub = useMemo(() => clubs.find(c => c.id === clubId), [clubs, clubId]);
+
+      // Reset sub-club when club changes
+      useEffect(() => {
+        setSubClub('');
+      }, [clubId]);
+
+      const handleAddItem = () => {
+        setItems([...items, { name: '', qty: 1, price: 0 }]);
+      };
+
+      const handleRemoveItem = (index) => {
+        if (items.length <= 1) return;
+        setItems(items.filter((_, idx) => idx !== index));
+      };
+
+      const handleItemChange = (index, field, value) => {
+        const updated = [...items];
+        updated[index][field] = field === 'name' ? value : Number(value);
+        setItems(updated);
+      };
+
+      const calculatedTotal = useMemo(() => {
+        return items.reduce((sum, item) => sum + (Number(item.qty) || 0) * (Number(item.price) || 0), 0);
+      }, [items]);
+
+      const validateForm = () => {
+        const newErr = {};
+        if (!requestedBy.trim()) newErr.requestedBy = "Please specify member name who collected or raised the bill.";
+        if (!event.trim()) newErr.event = "Please enter an event or workshop name.";
+        if (!billNo.trim()) newErr.billNo = "Enter shop's physical bill or voucher reference number.";
+        
+        // Prevent future dates
+        const today = new Date().toISOString().slice(0, 10);
+        if (billDate > today) newErr.billDate = "Enter a bill date that is not in the future.";
+
+        // Items validation
+        const emptyItems = items.some(i => !i.name.trim() || i.qty <= 0 || i.price < 0);
+        if (emptyItems) newErr.items = "All line items must have a description, positive quantity and non-negative unit price.";
+        if (calculatedTotal <= 0) newErr.total = "Total order spend must be greater than Rs 0.";
+
+        setErrors(newErr);
+        return Object.keys(newErr).length === 0;
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!validateForm()) return;
+
+        onSubmitOrder({
+          clubId,
+          subClub: selectedClub?.type === 'major' ? subClub : '',
+          requestedBy: sanitize(requestedBy),
+          event: sanitize(event),
+          billNo: sanitize(billNo).toUpperCase(),
+          billDate,
+          items: items.map(i => ({ name: sanitize(i.name), qty: Number(i.qty), price: Number(i.price) })),
+          total: calculatedTotal
+        });
+      };
+
+      return (
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm max-w-3xl mx-auto space-y-5">
+          <div className="border-b pb-3">
+            <h2 className="text-base font-bold text-slate-900">Raise New Purchase Order</h2>
+            <p className="text-xs text-slate-500">
+              Orders enter the ledger in <span className="font-semibold text-slate-700">"Awaiting treasurer code"</span> state and are never billable until authenticated.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            
+            {/* Club & Sub-Club Selectors */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Select Club / Department *</label>
+                <select
+                  value={clubId}
+                  onChange={(e) => setClubId(e.target.value)}
+                  className="w-full p-2.5 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                >
+                  {clubs.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.type === 'major' ? '(Major Club)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedClub?.type === 'major' && selectedClub.subClubs.length > 0 ? (
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Sub-Club / Department Wing *</label>
+                  <select
+                    value={subClub}
+                    onChange={(e) => setSubClub(e.target.value)}
+                    className="w-full p-2.5 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  >
+                    <option value="">-- Choose Sub-Club --</option>
+                    {selectedClub.subClubs.map((sub, i) => (
+                      <option key={i} value={sub}>{sub}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block font-semibold text-slate-400 mb-1">Sub-Club</label>
+                  <input
+                    type="text"
+                    disabled
+                    value="No sub-clubs for this entity"
+                    className="w-full p-2.5 border border-slate-200 rounded-lg bg-slate-100 text-slate-400"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Requested By & Event */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Requested By (Member Name) *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Tanmay Bhat (Event Head)"
+                  value={requestedBy}
+                  onChange={(e) => setRequestedBy(e.target.value)}
+                  className={`w-full p-2.5 border rounded-lg focus:outline-none ${errors.requestedBy ? 'border-rose-500 bg-rose-50' : 'border-slate-300'}`}
+                />
+                {errors.requestedBy && <p className="text-rose-600 text-[11px] mt-1">{errors.requestedBy}</p>}
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Event / Workshop Name *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Autonomous Bot Championship"
+                  value={event}
+                  onChange={(e) => setEvent(e.target.value)}
+                  className={`w-full p-2.5 border rounded-lg focus:outline-none ${errors.event ? 'border-rose-500 bg-rose-50' : 'border-slate-300'}`}
+                />
+                {errors.event && <p className="text-rose-600 text-[11px] mt-1">{errors.event}</p>}
+              </div>
+            </div>
+
+            {/* Shop Bill Number & Date */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Shop Physical Bill Number *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. SHP-9340"
+                  value={billNo}
+                  onChange={(e) => setBillNo(e.target.value)}
+                  className={`w-full p-2.5 border rounded-lg font-mono uppercase focus:outline-none ${errors.billNo ? 'border-rose-500 bg-rose-50' : 'border-slate-300'}`}
+                />
+                <p className="text-[10px] text-slate-400 mt-0.5">Scanned for duplicate collisions across all 21 clubs.</p>
+                {errors.billNo && <p className="text-rose-600 text-[11px] mt-1">{errors.billNo}</p>}
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Bill Date *</label>
+                <input
+                  type="date"
+                  value={billDate}
+                  onChange={(e) => setBillDate(e.target.value)}
+                  className={`w-full p-2.5 border rounded-lg focus:outline-none ${errors.billDate ? 'border-rose-500 bg-rose-50' : 'border-slate-300'}`}
+                />
+                {errors.billDate && <p className="text-rose-600 text-[11px] mt-1">{errors.billDate}</p>}
+              </div>
+            </div>
+
+            {/* LINE ITEMS TABLE */}
+            <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-slate-800">Stationery & Refreshment Line Items</span>
+                <button
+                  type="button"
+                  onClick={handleAddItem}
+                  className="px-2 py-1 bg-white border border-slate-300 text-indigo-600 font-semibold rounded hover:bg-indigo-50"
+                >
+                  + Add Item Row
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {items.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Item name (e.g. Whiteboard Markers)"
+                      value={item.name}
+                      onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
+                      className="flex-3 w-full p-2 border rounded bg-white"
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder="Qty"
+                      value={item.qty}
+                      onChange={(e) => handleItemChange(idx, 'qty', e.target.value)}
+                      className="w-16 p-2 border rounded bg-white text-center"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="Price each"
+                      value={item.price}
+                      onChange={(e) => handleItemChange(idx, 'price', e.target.value)}
+                      className="w-24 p-2 border rounded bg-white text-right"
+                    />
+                    <div className="w-24 text-right font-bold text-slate-700">
+                      {formatINR((item.qty || 0) * (item.price || 0))}
+                    </div>
+                    {items.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveItem(idx)}
+                        className="text-rose-500 hover:text-rose-700 font-bold px-2 py-1"
+                        title="Remove row"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {errors.items && <p className="text-rose-600 text-[11px]">{errors.items}</p>}
+
+              <div className="border-t border-slate-200 pt-2 flex justify-between items-center text-sm font-bold">
+                <span className="text-slate-600">Calculated PO Total:</span>
+                <span className="text-indigo-700 text-base">{formatINR(calculatedTotal)}</span>
+              </div>
+            </div>
+
+            {/* ACTION BUTTONS */}
+            <div className="flex space-x-3 pt-3">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="w-1/3 py-2.5 border border-slate-300 rounded-lg font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="w-2/3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-md"
+              >
+                Submit Purchase Order &rarr;
+              </button>
+            </div>
+          </form>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // 4.3: CLUBS & BUDGET LEDGER VIEW
+    // -------------------------------------------------------------
+    function ClubsLedgerView({ ledgers, role, onUnlockClub, onPrintClubStatement }) {
+      const [typeFilter, setTypeFilter] = useState('all');
+
+      const filteredClubs = useMemo(() => {
+        if (typeFilter === 'major') return ledgers.filter(c => c.type === 'major');
+        if (typeFilter === 'other') return ledgers.filter(c => c.type !== 'major');
+        return ledgers;
+      }, [ledgers, typeFilter]);
+
+      return (
+        <div className="space-y-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Club Financial Ledgers ({ledgers.length} Entities)</h2>
+              <p className="text-xs text-slate-500">Live annual allocation, authorized spend, and remaining shop budget progress.</p>
+            </div>
+            <div>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="text-xs py-1.5 px-3 border border-slate-300 rounded-lg bg-white text-slate-700"
+              >
+                <option value="all">All Club Classifications</option>
+                <option value="major">Major Clubs (With Sub-Clubs)</option>
+                <option value="other">Department & Motor Clubs</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredClubs.map(club => {
+              const isOver80 = club.percentSpent >= 80 && club.percentSpent <= 100;
+              const isOverBudget = club.percentSpent > 100;
+
+              return (
+                <div 
+                  key={club.id} 
+                  className={`bg-white rounded-xl border p-4 shadow-sm transition space-y-3 ${
+                    club.locked ? 'border-rose-300 bg-rose-50/20' : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <h3 className="font-bold text-sm text-slate-900">{club.name}</h3>
+                        {club.locked && (
+                          <span className="text-[10px] font-bold bg-rose-600 text-white px-1.5 py-0.5 rounded">
+                            🔒 LOCKED (3 WRONG CODES)
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        Treasurer: <span className="font-medium text-slate-700">{club.treasurerName}</span> ({club.treasurerContact})
+                      </p>
+                    </div>
+
+                    <span className="text-xs px-2 py-0.5 rounded font-mono font-bold bg-slate-100 text-slate-600">
+                      {club.type === 'major' ? 'Major Branch' : 'Association'}
+                    </span>
+                  </div>
+
+                  {/* Sub-clubs indicator if any */}
+                  {club.subClubs && club.subClubs.length > 0 && (
+                    <div className="text-[11px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-100">
+                      <strong>Wings ({club.subClubs.length}):</strong> {club.subClubs.join(', ')}
+                    </div>
+                  )}
+
+                  {/* BUDGET PROGRESS BAR */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span>Spent: {formatINR(club.spent)} ({Math.round(club.percentSpent)}%)</span>
+                      <span>Budget: {formatINR(club.annualBudget)}</span>
+                    </div>
+
+                    <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-500 ${
+                          isOverBudget ? 'bg-rose-600' :
+                          isOver80 ? 'bg-amber-500' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${Math.min(100, club.percentSpent)}%` }}
+                      ></div>
+                    </div>
+
+                    {isOverBudget && (
+                      <p className="text-[11px] text-rose-600 font-bold">
+                        ⚠️ Budget Exceeded by {formatINR(Math.abs(club.remaining))}!
+                      </p>
+                    )}
+                    {isOver80 && !isOverBudget && (
+                      <p className="text-[11px] text-amber-700 font-semibold">
+                        ⚠️ Warning: Spend has passed 80% threshold of annual allotment.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Financial Breakdown Grid */}
+                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-lg text-xs text-center border border-slate-100">
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">PAID</span>
+                      <span className="font-bold text-emerald-700">{formatINR(club.paid)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">SHOP DUES</span>
+                      <span className="font-bold text-amber-700">{formatINR(club.pending)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">REMAINING</span>
+                      <span className={`font-bold ${club.remaining < 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+                        {formatINR(club.remaining)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions Row */}
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <button
+                      onClick={() => onPrintClubStatement(club)}
+                      className="text-indigo-600 font-semibold hover:underline"
+                    >
+                      Print Ledger Statement &rarr;
+                    </button>
+
+                    {role === 'admin' && club.locked && (
+                      <button
+                        onClick={() => onUnlockClub(club.id)}
+                        className="px-2.5 py-1 bg-rose-600 text-white font-bold rounded shadow hover:bg-rose-700"
+                      >
+                        Reset & Unlock Club
+                      </button>
+                    )}
+                  </div>
+
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // 4.4: PAYMENTS LIST VIEW
+    // -------------------------------------------------------------
+    function PaymentsListView({ payments, orders, clubs, role, selectedTreasurerClubId, onExportCSV }) {
+      const [filterMode, setFilterMode] = useState('all');
+
+      const visiblePayments = useMemo(() => {
+        return payments.filter(p => {
+          if (role === 'treasurer' && p.clubId !== selectedTreasurerClubId) return false;
+          if (filterMode !== 'all' && p.mode !== filterMode) return false;
+          return true;
+        });
+      }, [payments, role, selectedTreasurerClubId, filterMode]);
+
+      const totalPaidAmount = useMemo(() => {
+        return visiblePayments.reduce((sum, p) => sum + p.amount, 0);
+      }, [visiblePayments]);
+
+      return (
+        <div className="space-y-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Payments Registry</h2>
+              <p className="text-xs text-slate-500">
+                Total settled in this view: <strong className="text-emerald-700">{formatINR(totalPaidAmount)}</strong>
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <select
+                value={filterMode}
+                onChange={(e) => setFilterMode(e.target.value)}
+                className="text-xs py-1.5 px-3 border border-slate-300 rounded-lg bg-white"
+              >
+                <option value="all">All Modes</option>
+                <option value="UPI">UPI</option>
+                <option value="Cash">Cash</option>
+                <option value="Bank transfer">Bank Transfer</option>
+              </select>
+
+              <button
+                onClick={onExportCSV}
+                className="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-300"
+              >
+                Export CSV
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto shadow-sm">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
+                <tr>
+                  <th className="p-3">Payment ID</th>
+                  <th className="p-3">Order Ref</th>
+                  <th className="p-3">Club</th>
+                  <th className="p-3">Date</th>
+                  <th className="p-3">Mode</th>
+                  <th className="p-3">Reference / UTR</th>
+                  <th className="p-3 text-right">Amount Paid</th>
+                  <th className="p-3">Signed By</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {visiblePayments.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-6 text-center text-slate-400">
+                      No payment records found.
+                    </td>
+                  </tr>
+                ) : (
+                  visiblePayments.map(pay => {
+                    const club = clubs.find(c => c.id === pay.clubId);
+                    return (
+                      <tr key={pay.id} className="hover:bg-slate-50">
+                        <td className="p-3 font-mono font-bold text-slate-800">{pay.id}</td>
+                        <td className="p-3 font-mono text-indigo-600">{pay.orderId}</td>
+                        <td className="p-3 font-medium text-slate-900">{club?.name}</td>
+                        <td className="p-3 text-slate-600">{pay.date}</td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 bg-slate-100 font-medium rounded text-[11px]">
+                            {pay.mode}
+                          </span>
+                        </td>
+                        <td className="p-3 font-mono text-slate-700">{pay.reference}</td>
+                        <td className="p-3 text-right font-extrabold text-emerald-700">{formatINR(pay.amount)}</td>
+                        <td className="p-3 text-slate-500 text-[11px]">{pay.recordedBy}</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // 4.5: FLAGS & ANTI-FRAUD VIEW
+    // -------------------------------------------------------------
+    function FlagsSecurityView({ flags, orders, clubs, role, selectedTreasurerClubId, onOpenAuthModal, onAdminReviewFlag, onAdminUnlockClub }) {
+      return (
+        <div className="space-y-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <h2 className="text-base font-bold text-slate-900">Anti-Fraud & Duplicate Bill Security Center</h2>
+            <p className="text-xs text-slate-500">
+              Heuristic detection flags repeated bill numbers, same-day expense collisions, and short-interval duplicate items.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {flags.length === 0 ? (
+              <div className="bg-white p-8 rounded-xl border border-slate-200 text-center">
+                <span className="text-3xl">🛡️</span>
+                <p className="text-xs text-slate-500 mt-2">Zero active duplicate flags. All orders pass verification checks.</p>
+              </div>
+            ) : (
+              flags.map(flag => {
+                const order = orders.find(o => o.id === flag.orderId);
+                const club = clubs.find(c => c.id === flag.clubId);
+
+                return (
+                  <div key={flag.id} className="bg-white p-4 rounded-xl border border-rose-200 shadow-sm space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rose-100 pb-2">
+                      <div className="flex items-center space-x-2">
+                        <span className="px-2 py-0.5 bg-rose-100 text-rose-800 font-mono text-xs font-bold rounded">
+                          {flag.id}
+                        </span>
+                        <span className="text-xs font-bold text-slate-900">{club?.name}</span>
+                        <span className="text-xs text-slate-400">Order #{flag.orderId}</span>
+                      </div>
+
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                        flag.status === 'pending' ? 'bg-amber-100 text-amber-800' :
+                        flag.status === 'confirmed_duplicate' ? 'bg-rose-600 text-white' : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {flag.status === 'pending' ? 'Pending Review' :
+                         flag.status === 'confirmed_duplicate' ? 'Confirmed Duplicate (Voided)' : 'Reviewed: Valid Purchase'}
+                      </span>
+                    </div>
+
+                    <div className="bg-rose-50/70 p-3 rounded-lg text-xs text-rose-800 space-y-1 border border-rose-200">
+                      <strong>Flag Reason:</strong> {flag.reason}
+                    </div>
+
+                    {order && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-600">
+                        <div>Event: <strong className="text-slate-800">{order.event}</strong></div>
+                        <div>Bill No: <strong className="text-slate-800">{order.billNo}</strong></div>
+                        <div>Total: <strong className="text-indigo-700">{formatINR(order.total)}</strong></div>
+                        <div>Date: <strong className="text-slate-800">{order.billDate}</strong></div>
+                      </div>
+                    )}
+
+                    {/* DECISION BUTTONS */}
+                    {flag.status === 'pending' && (
+                      <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-end gap-2 text-xs">
+                        {role === 'admin' ? (
+                          <>
+                            <button
+                              onClick={() => onAdminReviewFlag(flag, 'resolved_valid')}
+                              className="px-3 py-1.5 border border-slate-300 font-semibold rounded-lg text-slate-700 hover:bg-slate-50"
+                            >
+                              Admin Override: Mark Valid
+                            </button>
+                            <button
+                              onClick={() => onAdminReviewFlag(flag, 'confirmed_duplicate')}
+                              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg shadow-sm"
+                            >
+                              Admin: Confirm Duplicate (Void Order)
+                            </button>
+                          </>
+                        ) : role === 'treasurer' && flag.clubId === selectedTreasurerClubId ? (
+                          <>
+                            <button
+                              onClick={() => onOpenAuthModal('review_flag', order, { flag, decision: 'resolved_valid' })}
+                              className="px-3 py-1.5 border border-slate-300 font-semibold rounded-lg text-slate-700 hover:bg-slate-50"
+                            >
+                              Verify Valid with Passcode
+                            </button>
+                            <button
+                              onClick={() => onOpenAuthModal('review_flag', order, { flag, decision: 'confirmed_duplicate' })}
+                              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg shadow-sm"
+                            >
+                              Confirm Duplicate (Reversal Entry)
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-slate-400 italic">Reviewable by Club Treasurer or Faculty Coordinator.</span>
+                        )}
+                      </div>
+                    )}
+
+                    {flag.status !== 'pending' && (
+                      <div className="text-[11px] text-slate-500 pt-1">
+                        Reviewed by: <strong className="text-slate-700">{flag.reviewedBy}</strong> on {flag.reviewedAt?.slice(0, 10)}
+                      </div>
+                    )}
+
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // 4.6: REPORTS & INSIGHTS VIEW
+    // -------------------------------------------------------------
+    function ReportsView({ globalStats, clubLedgers, orders, role, highValueThreshold, onUpdateThreshold }) {
+      return (
+        <div className="space-y-5">
+          {/* Top Metric Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+              <span className="text-xs text-slate-500 block">Total Budget Allocation</span>
+              <span className="text-base sm:text-lg font-bold text-slate-900">{formatINR(globalStats.totalBudget)}</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+              <span className="text-xs text-slate-500 block">Total Authorized Spend</span>
+              <span className="text-base sm:text-lg font-bold text-indigo-700">{formatINR(globalStats.totalSpent)}</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+              <span className="text-xs text-slate-500 block">Total Shop Dues Pending</span>
+              <span className="text-base sm:text-lg font-bold text-amber-600">{formatINR(globalStats.totalPendingToShop)}</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+              <span className="text-xs text-slate-500 block">Flagged / Locked Clubs</span>
+              <span className="text-base sm:text-lg font-bold text-rose-600">
+                {globalStats.flaggedCount} Flags / {globalStats.lockedClubsCount} Locked
+              </span>
+            </div>
+          </div>
+
+          {/* Configurable High Value Anomaly Setting */}
+          {role === 'admin' && (
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between text-xs">
+              <div>
+                <span className="font-bold text-slate-800">Anomaly Highlight Threshold:</span>
+                <p className="text-slate-500">Orders exceeding this amount are automatically flagged with a "High value" badge.</p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="font-bold">Rs</span>
+                <input
+                  type="number"
+                  step={500}
+                  value={highValueThreshold}
+                  onChange={(e) => onUpdateThreshold(Number(e.target.value))}
+                  className="w-24 p-1.5 border rounded text-right font-bold text-indigo-700"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* TOP 5 SPENDERS BAR CHART (Pure CSS / SVG) */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+            <h3 className="font-bold text-sm text-slate-900">Top 5 Spending Clubs</h3>
+            <p className="text-xs text-slate-500">Comparing authorized purchase volumes against initial allocations.</p>
+
+            <div className="space-y-3 pt-2">
+              {globalStats.top5Spenders.map(club => {
+                const maxVal = globalStats.top5Spenders[0]?.spent || 1;
+                const widthPercent = Math.max(5, (club.spent / maxVal) * 100);
+
+                return (
+                  <div key={club.id} className="space-y-1 text-xs">
+                    <div className="flex justify-between font-medium">
+                      <span>{club.name}</span>
+                      <span className="font-bold text-slate-800">{formatINR(club.spent)}</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-4 rounded-md overflow-hidden flex items-center">
+                      <div 
+                        className="bg-indigo-600 h-full rounded-md transition-all duration-500" 
+                        style={{ width: `${widthPercent}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* EVENT-WISE SPEND SUMMARY */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+            <h3 className="font-bold text-sm text-slate-900">Event-wise Expense Breakdown</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                  <tr>
+                    <th className="p-2.5">Event Name</th>
+                    <th className="p-2.5">Club</th>
+                    <th className="p-2.5">Date</th>
+                    <th className="p-2.5 text-right">Total Cost</th>
+                    <th className="p-2.5 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {orders.map(o => (
+                    <tr key={o.id}>
+                      <td className="p-2.5 font-medium text-slate-900">{o.event}</td>
+                      <td className="p-2.5 text-slate-600">{o.clubId.toUpperCase()}</td>
+                      <td className="p-2.5 text-slate-500">{o.billDate}</td>
+                      <td className="p-2.5 text-right font-bold text-slate-800">{formatINR(o.total)}</td>
+                      <td className="p-2.5 text-center">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100">
+                          {o.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // 4.7: AUDIT TRAIL VIEW (ADMIN EXCLUSIVE)
+    // -------------------------------------------------------------
+    function AuditTrailView({ auditLogs, clubs }) {
+      const [actionFilter, setActionFilter] = useState('all');
+
+      const filteredLogs = useMemo(() => {
+        if (actionFilter === 'all') return auditLogs;
+        return auditLogs.filter(l => l.action === actionFilter);
+      }, [auditLogs, actionFilter]);
+
+      return (
+        <div className="space-y-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="px-2 py-0.5 bg-purple-100 text-purple-800 font-mono text-xs font-bold rounded">
+                  APPEND-ONLY
+                </span>
+                <h2 className="text-base font-bold text-slate-900">Immutable Audit Trail ({auditLogs.length} Events)</h2>
+              </div>
+              <p className="text-xs text-slate-500">Every authorization, payment, lockout, and reversal is logged permanently.</p>
+            </div>
+
+            <select
+              value={actionFilter}
+              onChange={(e) => setActionFilter(e.target.value)}
+              className="text-xs py-1.5 px-3 border border-slate-300 rounded-lg bg-white"
+            >
+              <option value="all">All Action Types</option>
+              <option value="ORDER_CREATED">Order Created</option>
+              <option value="ORDER_AUTHORIZED">Order Authorized</option>
+              <option value="ORDER_REJECTED">Order Rejected</option>
+              <option value="PAYMENT_RECORDED">Payment Recorded</option>
+              <option value="FAILED_CODE_ATTEMPT">Failed Code Attempt</option>
+              <option value="CLUB_LOCKED">Club Locked</option>
+              <option value="CLUB_UNLOCKED">Club Unlocked</option>
+              <option value="DUPLICATE_FLAGGED">Duplicate Flagged</option>
+              <option value="REVERSAL_ENTRY">Reversal Entry</option>
+            </select>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto shadow-sm">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
+                <tr>
+                  <th className="p-3">Log ID</th>
+                  <th className="p-3">Timestamp</th>
+                  <th className="p-3">Actor</th>
+                  <th className="p-3">Action</th>
+                  <th className="p-3">Target Entity</th>
+                  <th className="p-3">Event Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-mono">
+                {filteredLogs.map(log => {
+                  const isAlert = log.action === 'CLUB_LOCKED' || log.action === 'FAILED_CODE_ATTEMPT' || log.action === 'DUPLICATE_FLAGGED';
+
+                  return (
+                    <tr key={log.id} className={isAlert ? 'bg-rose-50/50' : 'hover:bg-slate-50'}>
+                      <td className="p-3 text-slate-400">{log.id}</td>
+                      <td className="p-3 text-slate-500 whitespace-nowrap">{log.timestamp.replace('T', ' ').slice(0, 19)}</td>
+                      <td className="p-3 font-medium text-slate-800 font-sans">{log.actor}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          log.action === 'ORDER_AUTHORIZED' ? 'bg-indigo-100 text-indigo-800' :
+                          log.action === 'PAYMENT_RECORDED' ? 'bg-emerald-100 text-emerald-800' :
+                          log.action === 'CLUB_LOCKED' ? 'bg-rose-600 text-white' :
+                          log.action === 'REVERSAL_ENTRY' ? 'bg-purple-100 text-purple-800' :
+                          'bg-slate-200 text-slate-700'
+                        }`}>
+                          {log.action}
+                        </span>
+                      </td>
+                      <td className="p-3 text-slate-700">{log.entity} #{log.entityId}</td>
+                      <td className="p-3 font-sans text-slate-700">{log.details}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    // Render the React application into root
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
