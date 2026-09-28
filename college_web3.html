@@ -1,0 +1,2249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Campus Vault - Secure Club Finance & PO Gateway</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            pccoe: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              800: '#0c4a6e',
+              900: '#082f49',
+            },
+            vault: {
+              gold: '#f59e0b',
+              dark: '#0f172a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18 & Babel Standalone -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @media print {
+      body { background: white !important; color: black !important; font-size: 11pt; }
+      .no-print, header, nav, #bottom-nav, .modal-backdrop, button { display: none !important; }
+      .print-only { display: block !important; }
+      .print-card { border: 1px solid #ccc !important; box-shadow: none !important; margin: 0 !important; width: 100% !important; page-break-inside: avoid; }
+    }
+    .print-only { display: none; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 font-sans antialiased min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // =========================================================================
+    // SECTION 1: CONFIG & SEED DATA (EXTRACTED FROM PCCOE IMAGES & RECORDS)
+    // =========================================================================
+    
+    // PCCOE Motor Sports & Departmental Clubs
+    const INITIAL_CONFIG_CLUBS = [
+      // Verified Motor Sports Teams from Table
+      { id: 'red_baron', name: 'Team Red Baron', type: 'other', category: 'Motor Sports', secretary: 'Mr. U.I. Shaikh (Mech)', coSecretary: 'Mr. Rohit Tate (IT)', subClubs: [], treasurerName: 'Mr. U.I. Shaikh', treasurerContact: '+91 98220 11001', plainCode: '1101', annualBudget: 180000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'kratos', name: 'Team Kratos Racing', type: 'other', category: 'Motor Sports', secretary: 'Dr. S.R. Wankhede (Mech)', coSecretary: 'Dr. Manish Narkhede (ENTC)', subClubs: [], treasurerName: 'Dr. S.R. Wankhede', treasurerContact: '+91 98220 22002', plainCode: '2202', annualBudget: 220000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'solarium', name: 'Team Solarium', type: 'other', category: 'Motor Sports', secretary: 'Dr. Jaya Goyal (Mech)', coSecretary: 'Dr. Pramod Sonavane (ENTC)', subClubs: [], treasurerName: 'Dr. Jaya Goyal', treasurerContact: '+91 98220 33003', plainCode: '3303', annualBudget: 160000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'ambush', name: 'Team Ambush', type: 'other', category: 'Motor Sports', secretary: 'Dr. I.R. Satone (Mech)', coSecretary: 'Mr. Rahul Pitale (Computer)', subClubs: [], treasurerName: 'Dr. I.R. Satone', treasurerContact: '+91 98220 44004', plainCode: '4404', annualBudget: 150000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'automatons', name: 'Team Automatons', type: 'other', category: 'Motor Sports', secretary: 'Dr. S.B. Matekar (Mech)', coSecretary: 'Dr. Varsha Bendre (ENTC)', subClubs: [], treasurerName: 'Dr. S.B. Matekar', treasurerContact: '+91 98220 55005', plainCode: '5505', annualBudget: 200000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'maverick', name: 'Team Maverick India', type: 'other', category: 'Motor Sports', secretary: 'Prof. C.R. Ingole (Mech)', coSecretary: 'Mr. Ajjay Ghade (ENTC)', subClubs: [], treasurerName: 'Prof. C.R. Ingole', treasurerContact: '+91 98220 66006', plainCode: '6606', annualBudget: 140000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'anantam', name: 'Team Anantam', type: 'other', category: 'Motor Sports', secretary: 'Dr Jayesh Chordiya (Mech)', coSecretary: 'Dr. Ashwini Shinde (ENTC)', subClubs: [], treasurerName: 'Dr Jayesh Chordiya', treasurerContact: '+91 98220 77007', plainCode: '7707', annualBudget: 130000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'coding_club', name: 'Coding Club', type: 'other', category: 'Technical Communities', secretary: 'Mr. Abhishek Raut (Computer)', coSecretary: 'N/A', subClubs: [], treasurerName: 'Mr. Abhishek Raut', treasurerContact: '+91 98220 88008', plainCode: '8808', annualBudget: 110000, status: 'active', failedAttempts: 0, locked: false },
+      
+      // Academic Department Associations
+      { id: 'aimsa', name: 'AIMSA (AI & Machine Learning)', type: 'other', category: 'Department Association', secretary: 'Prof. V. Kulkarni', coSecretary: 'N/A', subClubs: [], treasurerName: 'Prof. V. Kulkarni', treasurerContact: '+91 98201 11111', plainCode: '1111', annualBudget: 95000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'cesa', name: 'CESA (Computer Engineering)', type: 'other', category: 'Department Association', secretary: 'Prof. S. Joshi', coSecretary: 'N/A', subClubs: [], treasurerName: 'Prof. S. Joshi', treasurerContact: '+91 98201 22222', plainCode: '2222', annualBudget: 110000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'cresa', name: 'CRESA (Chemical Engineering)', type: 'other', category: 'Department Association', secretary: 'Prof. M. Patil', coSecretary: 'N/A', subClubs: [], treasurerName: 'Prof. M. Patil', treasurerContact: '+91 98201 33333', plainCode: '3333', annualBudget: 75000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'itsa', name: 'ITSA (Information Tech)', type: 'other', category: 'Department Association', secretary: 'Prof. N. Deshmukh', coSecretary: 'N/A', subClubs: [], treasurerName: 'Prof. N. Deshmukh', treasurerContact: '+91 98201 44444', plainCode: '4444', annualBudget: 85000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'etsa', name: 'ETSA (Electronics & Telecom)', type: 'other', category: 'Department Association', secretary: 'Prof. R. Shinde', coSecretary: 'N/A', subClubs: [], treasurerName: 'Prof. R. Shinde', treasurerContact: '+91 98201 55555', plainCode: '5555', annualBudget: 90000, status: 'active', failedAttempts: 0, locked: false },
+      { id: 'ciesa', name: 'CIESA (Civil Engineering)', type: 'other', category: 'Department Association', secretary: 'Prof. K. Gokhale', coSecretary: 'N/A', subClubs: [], treasurerName: 'Prof. K. Gokhale', treasurerContact: '+91 98201 66666', plainCode: '6666', annualBudget: 70000, status: 'active', failedAttempts: 0, locked: false },
+      
+      // Major Student Chapter with Departmental Sub-Clubs
+      { 
+        id: 'ieee_pccoe', 
+        name: 'IEEE PCCOE Student Branch', 
+        type: 'major', 
+        category: 'Major Student Chapter',
+        secretary: 'Dr. S. K. Babar',
+        coSecretary: 'Prof. A. S. Pawar',
+        subClubs: [
+          'IEEE-Dept 1 (Computer Society)',
+          'IEEE-Dept 2 (Signal Processing)',
+          'IEEE-Dept 3 (Power & Energy)',
+          'IEEE-Dept 4 (Robotics & Automation)',
+          'IEEE-Dept 5 (Women in Engineering)',
+          'IEEE-Dept 6 (Circuits & Systems)'
+        ], 
+        treasurerName: 'Dr. S. K. Babar', 
+        treasurerContact: '+91 98205 99999', 
+        plainCode: '9999', 
+        annualBudget: 250000, 
+        status: 'active', 
+        failedAttempts: 0, 
+        locked: false 
+      }
+    ];
+
+    // Authorized User Directory (Strict Authentication Guardrail)
+    const AUTHORIZED_ACCOUNTS = [
+      { email: 'member@pccoe.edu.in', password: 'password123', name: 'Tanmay Bhat (Student Head)', role: 'member', clubId: 'automatons' },
+      { email: 'dr.matekar@pccoe.edu.in', password: 'password123', name: 'Dr. S.B. Matekar (Faculty In-Charge)', role: 'treasurer', clubId: 'automatons' },
+      { email: 'dr.wankhede@pccoe.edu.in', password: 'password123', name: 'Dr. S.R. Wankhede (Faculty In-Charge)', role: 'treasurer', clubId: 'kratos' },
+      { email: 'shop.desk@pccoe.edu.in', password: 'password123', name: 'Mr. Ramesh Gupta (Campus Store Desk)', role: 'shopkeeper', clubId: null },
+      { email: 'dean.studentaffairs@pccoe.edu.in', password: 'password123', name: 'Dean Student Affairs (Admin)', role: 'admin', clubId: null }
+    ];
+
+    const SEED_ORDERS = [
+      {
+        id: 'VAULT-ORD-101',
+        clubId: 'automatons',
+        subClub: '',
+        category: 'Tech & Equipment',
+        requestedBy: 'Tanmay Bhat',
+        event: 'BAJA SAE Chassis Tuning',
+        billNo: 'SHP-8812',
+        billDate: '2026-09-21',
+        items: [
+          { name: 'Industrial Masking Tape & High-Heat Markers', qty: 8, price: 250 },
+          { name: 'Solder Wire & Desoldering Braids', qty: 5, price: 340 },
+          { name: 'Refreshment Biscuits & Energy Packs', qty: 35, price: 40 }
+        ],
+        total: 5100,
+        status: 'Paid',
+        flagged: false,
+        flagReason: '',
+        createdAt: '2026-09-21T10:15:00Z'
+      },
+      {
+        id: 'VAULT-ORD-102',
+        clubId: 'kratos',
+        subClub: '',
+        category: 'Marketing & Prints',
+        requestedBy: 'Aditya Ranade',
+        event: 'Formula Bharat Sponsorship Drive',
+        billNo: 'SHP-8845',
+        billDate: '2026-09-24',
+        items: [
+          { name: 'A3 Glossy Color Brochures', qty: 150, price: 25 },
+          { name: 'Lanyards & Identification Pouches', qty: 40, price: 30 }
+        ],
+        total: 4950,
+        status: 'Partially paid',
+        flagged: false,
+        flagReason: '',
+        createdAt: '2026-09-24T14:30:00Z'
+      },
+      {
+        id: 'VAULT-ORD-103',
+        clubId: 'coding_club',
+        subClub: '',
+        category: 'Events',
+        requestedBy: 'Neha Sharma',
+        event: 'Campus HackMatrix 2026',
+        billNo: 'SHP-8901',
+        billDate: '2026-09-26',
+        items: [
+          { name: 'Samosa & Cold Drink Combos', qty: 80, price: 45 },
+          { name: 'A4 Printing Reams (Pack of 5)', qty: 3, price: 320 }
+        ],
+        total: 4560,
+        status: 'Awaiting code',
+        flagged: false,
+        flagReason: '',
+        createdAt: '2026-09-26T11:00:00Z'
+      },
+      {
+        id: 'VAULT-ORD-104',
+        clubId: 'solarium',
+        subClub: '',
+        category: 'Tech & Equipment',
+        requestedBy: 'Pratik Rao',
+        event: 'Solar Telemetry Calibration',
+        billNo: 'SHP-8711',
+        billDate: '2026-09-18',
+        items: [
+          { name: 'Sensor Interface Wires 50m', qty: 2, price: 800 },
+          { name: 'Hot Glue Guns & Sticks Pack', qty: 4, price: 220 }
+        ],
+        total: 2480,
+        status: 'Rejected',
+        flagged: false,
+        flagReason: '',
+        createdAt: '2026-09-18T09:00:00Z'
+      },
+      {
+        id: 'VAULT-ORD-105',
+        clubId: 'red_baron',
+        subClub: '',
+        category: 'Events',
+        requestedBy: 'Harsh Joshi',
+        event: 'Go-Kart Track Endurance Test',
+        billNo: 'SHP-8812', // DELIBERATE DUPLICATE BILL NO!
+        billDate: '2026-09-27',
+        items: [
+          { name: 'Squad Meal Boxes', qty: 40, price: 80 },
+          { name: 'Pit Board Whiteboard Markers', qty: 5, price: 90 }
+        ],
+        total: 3650,
+        status: 'Awaiting code',
+        flagged: true,
+        flagReason: 'Duplicate Bill Number: "SHP-8812" collision with order VAULT-ORD-101',
+        createdAt: '2026-09-27T13:20:00Z'
+      }
+    ];
+
+    const SEED_PAYMENTS = [
+      { id: 'PAY-101', orderId: 'VAULT-ORD-101', clubId: 'automatons', amount: 5100, mode: 'UPI', reference: 'UPI/PCCOE/20260921/8719', date: '2026-09-22', note: 'Settled via Official Campus UPI', recordedBy: 'Dr. S.B. Matekar' },
+      { id: 'PAY-102', orderId: 'VAULT-ORD-102', clubId: 'kratos', amount: 2500, mode: 'Cash', reference: 'CASH-VOUCH-41', date: '2026-09-25', note: '50% advance cleared at store counter', recordedBy: 'Dr. S.R. Wankhede' }
+    ];
+
+    const SEED_FLAGS = [
+      {
+        id: 'FLG-01',
+        orderId: 'VAULT-ORD-105',
+        clubId: 'red_baron',
+        reason: 'Duplicate Bill Number: "SHP-8812" already registered by Team Automatons',
+        status: 'pending',
+        createdAt: '2026-09-27T13:20:00Z',
+        reviewedBy: null,
+        reviewedAt: null
+      }
+    ];
+
+    const SEED_AUDIT = [
+      { id: 'AUD-901', actor: 'Tanmay Bhat (Member)', action: 'ORDER_CREATED', entity: 'Order', entityId: 'VAULT-ORD-101', details: 'Raised PO for BAJA SAE Tuning (Rs 5,100)', timestamp: '2026-09-21T10:15:00Z' },
+      { id: 'AUD-902', actor: 'Dr. S.B. Matekar (Treasurer)', action: 'ORDER_AUTHORIZED', entity: 'Order', entityId: 'VAULT-ORD-101', details: 'Authenticated via SHA-256 faculty passcode', timestamp: '2026-09-21T12:00:00Z' },
+      { id: 'AUD-903', actor: 'Dr. S.B. Matekar (Treasurer)', action: 'PAYMENT_RECORDED', entity: 'Payment', entityId: 'PAY-101', details: 'Paid full Rs 5,100 via UPI/PCCOE/20260921/8719', timestamp: '2026-09-22T09:30:00Z' },
+      { id: 'AUD-904', actor: 'SYSTEM_DETECTOR', action: 'DUPLICATE_FLAGGED', entity: 'Order', entityId: 'VAULT-ORD-105', details: 'Triggered bill collision for bill SHP-8812', timestamp: '2026-09-27T13:20:05Z' }
+    ];
+
+    // =========================================================================
+    // SECTION 2: CRYPTO & GUARDRAIL UTILITIES
+    // =========================================================================
+    
+    // Browser Native SHA-256 Hashing
+    async function sha256(text) {
+      const msgBuffer = new TextEncoder().encode(text.trim());
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // Pluggable verification routine
+    async function verifyTreasurerCode(club, inputCode) {
+      if (!club || !inputCode || club.locked) return false;
+      const inputHash = await sha256(inputCode);
+      return inputHash === club.codeHash;
+    }
+
+    const formatINR = (val) => {
+      const num = Number(val) || 0;
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0
+      }).format(num);
+    };
+
+    const sanitize = (str) => {
+      if (typeof str !== 'string') return '';
+      return str.replace(/[<>]/g, '').trim();
+    };
+
+    const normalizeBillNo = (val) => {
+      return (val || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    };
+
+    // =========================================================================
+    // SECTION 3: MAIN APP CONTROLLER
+    // =========================================================================
+    function CampusVaultApp() {
+      // Session Authentication State (Gatekeeper Guardrail)
+      const [currentUser, setCurrentUser] = useState(() => {
+        const saved = sessionStorage.getItem('cv_session_user');
+        return saved ? JSON.parse(saved) : null;
+      });
+
+      // Login Screen Form State
+      const [loginEmail, setLoginEmail] = useState('');
+      const [loginPassword, setLoginPassword] = useState('');
+      const [loginError, setLoginError] = useState('');
+
+      // Active Section Tabs: 'orders' | 'new-order' | 'clubs' | 'payments' | 'flags' | 'budget' | 'audit'
+      const [activeTab, setActiveTab] = useState('orders');
+
+      // Global Persistent State
+      const [clubs, setClubs] = useState([]);
+      const [orders, setOrders] = useState([]);
+      const [payments, setPayments] = useState([]);
+      const [flags, setFlags] = useState([]);
+      const [auditLogs, setAuditLogs] = useState([]);
+      const [highValueThreshold, setHighValueThreshold] = useState(5000);
+      const [demoShowCodes, setDemoShowCodes] = useState(false);
+      const [toast, setToast] = useState(null);
+
+      // Security Passcode Action Modal
+      const [authModal, setAuthModal] = useState({
+        isOpen: false,
+        actionType: null,
+        targetOrder: null,
+        targetPaymentData: null,
+        targetFlag: null,
+        decision: null,
+        inputCode: '',
+        errorMessage: ''
+      });
+
+      const [printPreview, setPrintPreview] = useState(null);
+
+      // -------------------------------------------------------------
+      // INITIAL DATA HYDRATION
+      // -------------------------------------------------------------
+      useEffect(() => {
+        const hydrateStore = async () => {
+          const cachedClubs = localStorage.getItem('cv_clubs_data');
+          const cachedOrders = localStorage.getItem('cv_orders_data');
+          const cachedPayments = localStorage.getItem('cv_payments_data');
+          const cachedFlags = localStorage.getItem('cv_flags_data');
+          const cachedAudit = localStorage.getItem('cv_audit_data');
+
+          if (cachedClubs && cachedOrders) {
+            setClubs(JSON.parse(cachedClubs));
+            setOrders(JSON.parse(cachedOrders));
+            setPayments(cachedPayments ? JSON.parse(cachedPayments) : []);
+            setFlags(cachedFlags ? JSON.parse(cachedFlags) : []);
+            setAuditLogs(cachedAudit ? JSON.parse(cachedAudit) : []);
+          } else {
+            // Hash codes via native Web Cryptography
+            const secureClubs = await Promise.all(INITIAL_CONFIG_CLUBS.map(async (c) => ({
+              ...c,
+              codeHash: await sha256(c.plainCode)
+            })));
+            setClubs(secureClubs);
+            setOrders(SEED_ORDERS);
+            setPayments(SEED_PAYMENTS);
+            setFlags(SEED_FLAGS);
+            setAuditLogs(SEED_AUDIT);
+            localStorage.setItem('cv_clubs_data', JSON.stringify(secureClubs));
+            localStorage.setItem('cv_orders_data', JSON.stringify(SEED_ORDERS));
+            localStorage.setItem('cv_payments_data', JSON.stringify(SEED_PAYMENTS));
+            localStorage.setItem('cv_flags_data', JSON.stringify(SEED_FLAGS));
+            localStorage.setItem('cv_audit_data', JSON.stringify(SEED_AUDIT));
+          }
+        };
+        hydrateStore();
+      }, []);
+
+      // Auto-save changes
+      useEffect(() => { if (clubs.length) localStorage.setItem('cv_clubs_data', JSON.stringify(clubs)); }, [clubs]);
+      useEffect(() => { if (orders.length) localStorage.setItem('cv_orders_data', JSON.stringify(orders)); }, [orders]);
+      useEffect(() => { localStorage.setItem('cv_payments_data', JSON.stringify(payments)); }, [payments]);
+      useEffect(() => { localStorage.setItem('cv_flags_data', JSON.stringify(flags)); }, [flags]);
+      useEffect(() => { localStorage.setItem('cv_audit_data', JSON.stringify(auditLogs)); }, [auditLogs]);
+
+      const showToast = (message, type = 'info') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 4000);
+      };
+
+      // -------------------------------------------------------------
+      // AUTHENTICATION LOGIC (GATEKEEPER)
+      // -------------------------------------------------------------
+      const handleLogin = (e) => {
+        e.preventDefault();
+        const account = AUTHORIZED_ACCOUNTS.find(
+          u => u.email.toLowerCase() === loginEmail.trim().toLowerCase() && u.password === loginPassword
+        );
+
+        if (!account) {
+          setLoginError('Access Denied: Invalid institutional credentials or unauthorized user.');
+          return;
+        }
+
+        setCurrentUser(account);
+        sessionStorage.setItem('cv_session_user', JSON.stringify(account));
+        setLoginError('');
+        showToast(`Welcome back, ${account.name}`, 'success');
+      };
+
+      const handleLogout = () => {
+        setCurrentUser(null);
+        sessionStorage.removeItem('cv_session_user');
+        setLoginEmail('');
+        setLoginPassword('');
+        showToast('Logged out securely.', 'info');
+      };
+
+      const handleQuickLogin = (acc) => {
+        setLoginEmail(acc.email);
+        setLoginPassword(acc.password);
+      };
+
+      // Reset Demo State
+      const handleResetDemo = async () => {
+        if (confirm("Reset Campus Vault database to factory PCCOE seed records?")) {
+          localStorage.clear();
+          const secureClubs = await Promise.all(INITIAL_CONFIG_CLUBS.map(async (c) => ({
+            ...c,
+            codeHash: await sha256(c.plainCode)
+          })));
+          setClubs(secureClubs);
+          setOrders(SEED_ORDERS);
+          setPayments(SEED_PAYMENTS);
+          setFlags(SEED_FLAGS);
+          setAuditLogs(SEED_AUDIT);
+          showToast('Data reset successfully.', 'success');
+        }
+      };
+
+      // Append-Only Audit Logging
+      const logAudit = (actorName, action, entity, entityId, details) => {
+        const item = {
+          id: `AUD-${Date.now().toString().slice(-6)}`,
+          actor: actorName,
+          action,
+          entity,
+          entityId,
+          details,
+          timestamp: new Date().toISOString()
+        };
+        setAuditLogs(prev => [item, ...prev]);
+      };
+
+      // -------------------------------------------------------------
+      // DUPLICATE BILL GUARDRAILS (3 HEURISTICS)
+      // -------------------------------------------------------------
+      const detectDuplicates = (orderInput) => {
+        const normBill = normalizeBillNo(orderInput.billNo);
+        const orderDate = new Date(orderInput.billDate);
+        const total = Number(orderInput.total);
+        const itemSignature = orderInput.items
+          .map(i => `${sanitize(i.name).toLowerCase()}:${i.qty}:${i.price}`)
+          .sort()
+          .join('|');
+
+        for (const existing of orders) {
+          // Heuristic A: Exact shop bill collision
+          if (normBill && normalizeBillNo(existing.billNo) === normBill) {
+            return `Duplicate Bill Number collision: "${orderInput.billNo}" matches existing ${existing.id} (${existing.clubId.toUpperCase()})`;
+          }
+          // Heuristic B: Same club + Same total + Same bill date
+          if (existing.clubId === orderInput.clubId && Number(existing.total) === total && existing.billDate === orderInput.billDate) {
+            return `Identical Expense: ${existing.clubId.toUpperCase()} already submitted bill of ${formatINR(total)} on ${existing.billDate}`;
+          }
+          // Heuristic C: Same club + Same items within 3 days
+          if (existing.clubId === orderInput.clubId && Number(existing.total) === total) {
+            const diffDays = Math.abs(orderDate - new Date(existing.billDate)) / (1000 * 60 * 60 * 24);
+            if (diffDays <= 3) {
+              const existingSig = existing.items.map(i => `${sanitize(i.name).toLowerCase()}:${i.qty}:${i.price}`).sort().join('|');
+              if (itemSignature === existingSig) {
+                return `Redundant Purchase: Identical line items & total submitted within 3 days of ${existing.id}`;
+              }
+            }
+          }
+        }
+        return null;
+      };
+
+      // -------------------------------------------------------------
+      // ORDER RAISING
+      // -------------------------------------------------------------
+      const handleCreateOrder = (orderData) => {
+        const orderId = `VAULT-ORD-${String(orders.length + 101).padStart(3, '0')}`;
+        const dupReason = detectDuplicates(orderData);
+        const isFlagged = Boolean(dupReason);
+
+        const newEntry = {
+          ...orderData,
+          id: orderId,
+          status: 'Awaiting code',
+          flagged: isFlagged,
+          flagReason: dupReason || '',
+          createdAt: new Date().toISOString()
+        };
+
+        setOrders(prev => [newEntry, ...prev]);
+
+        if (isFlagged) {
+          const flagItem = {
+            id: `FLG-${Date.now().toString().slice(-4)}`,
+            orderId: orderId,
+            clubId: orderData.clubId,
+            reason: dupReason,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            reviewedBy: null,
+            reviewedAt: null
+          };
+          setFlags(prev => [flagItem, ...prev]);
+          logAudit(currentUser.name, 'DUPLICATE_FLAGGED', 'Order', orderId, dupReason);
+        }
+
+        logAudit(
+          currentUser.name,
+          'ORDER_CREATED',
+          'Order',
+          orderId,
+          `Raised for ${orderData.event} [${orderData.category}] (${formatINR(orderData.total)})${isFlagged ? ' [GUARDRAIL WARNING TRIGGERED]' : ''}`
+        );
+
+        showToast(
+          isFlagged ? 'Warning: Duplicate collision flagged for faculty review!' : `Order ${orderId} raised. Awaiting faculty passcode authorization.`,
+          isFlagged ? 'warning' : 'success'
+        );
+        setActiveTab('orders');
+      };
+
+      // -------------------------------------------------------------
+      // SECURITY VERIFICATION EXECUTION
+      // -------------------------------------------------------------
+      const handleTriggerSecureAction = (actionType, order, extra = {}) => {
+        const club = clubs.find(c => c.id === order.clubId);
+        if (!club) return;
+        if (club.locked) {
+          alert(`SECURITY LOCKOUT: Approval authority for ${club.name} is LOCKED due to 3 consecutive wrong passcodes. Only Dean/Admin can unlock.`);
+          return;
+        }
+
+        setAuthModal({
+          isOpen: true,
+          actionType,
+          targetOrder: order,
+          targetPaymentData: extra.paymentData || null,
+          targetFlag: extra.flag || null,
+          decision: extra.decision || null,
+          inputCode: '',
+          errorMessage: ''
+        });
+      };
+
+      const handleExecuteAuthorization = async (e) => {
+        e.preventDefault();
+        const { actionType, targetOrder, targetPaymentData, targetFlag, decision, inputCode } = authModal;
+        const club = clubs.find(c => c.id === targetOrder.clubId);
+        if (!club) return;
+
+        // SHA-256 verification
+        const isMatch = await verifyTreasurerCode(club, inputCode);
+
+        if (!isMatch) {
+          const failed = (club.failedAttempts || 0) + 1;
+          const isNowLocked = failed >= 3;
+          const remaining = 3 - failed;
+
+          setClubs(prev => prev.map(c => c.id === club.id ? { ...c, failedAttempts: failed, locked: isNowLocked } : c));
+
+          logAudit(
+            'Security Gatekeeper',
+            isNowLocked ? 'CLUB_LOCKED' : 'FAILED_CODE_ATTEMPT',
+            'Club',
+            club.id,
+            `Failed passcode attempt #${failed} on ${club.name}. ${isNowLocked ? 'HARD LOCKOUT ACTIVATED.' : `${remaining} attempts remaining.`}`
+          );
+
+          if (isNowLocked) {
+            setAuthModal(prev => ({ ...prev, isOpen: false }));
+            alert(`SECURITY BREACH PREVENTED: 3 incorrect passcodes entered. Approvals for ${club.name} are now FROZEN. Admin unlock required.`);
+          } else {
+            setAuthModal(prev => ({
+              ...prev,
+              errorMessage: `Incorrect passcode. Guardrail alert: ${remaining} attempt(s) remaining before automatic team lock!`
+            }));
+          }
+          return;
+        }
+
+        // Passcode succeeded: clear fail counter
+        setClubs(prev => prev.map(c => c.id === club.id ? { ...c, failedAttempts: 0 } : c));
+
+        if (actionType === 'authorize') {
+          setOrders(prev => prev.map(o => o.id === targetOrder.id ? { ...o, status: 'Authorized' } : o));
+          logAudit(currentUser.name, 'ORDER_AUTHORIZED', 'Order', targetOrder.id, `Authorized PO total ${formatINR(targetOrder.total)}`);
+          showToast(`Order ${targetOrder.id} authorized. Added to billing queue.`, 'success');
+        } 
+        else if (actionType === 'reject') {
+          setOrders(prev => prev.map(o => o.id === targetOrder.id ? { ...o, status: 'Rejected' } : o));
+          logAudit(currentUser.name, 'ORDER_REJECTED', 'Order', targetOrder.id, `Rejected PO total ${formatINR(targetOrder.total)}`);
+          showToast(`Order ${targetOrder.id} rejected.`, 'info');
+        }
+        else if (actionType === 'record_payment') {
+          const payAmt = Number(targetPaymentData.amount);
+          const payId = `PAY-${Date.now().toString().slice(-4)}`;
+          
+          const newPayment = {
+            id: payId,
+            orderId: targetOrder.id,
+            clubId: targetOrder.clubId,
+            amount: payAmt,
+            mode: targetPaymentData.mode,
+            reference: targetPaymentData.reference || 'N/A',
+            date: targetPaymentData.date,
+            note: targetPaymentData.note || '',
+            recordedBy: currentUser.name
+          };
+
+          const existingPaid = payments.filter(p => p.orderId === targetOrder.id).reduce((s, p) => s + p.amount, 0);
+          const totalAfter = existingPaid + payAmt;
+          const nextStatus = totalAfter >= targetOrder.total ? 'Paid' : 'Partially paid';
+
+          setPayments(prev => [newPayment, ...prev]);
+          setOrders(prev => prev.map(o => o.id === targetOrder.id ? { ...o, status: nextStatus } : o));
+
+          logAudit(currentUser.name, 'PAYMENT_RECORDED', 'Payment', payId, `Recorded payment of ${formatINR(payAmt)} (${nextStatus})`);
+          showToast(`Payment of ${formatINR(payAmt)} registered. Status: ${nextStatus}`, 'success');
+        }
+        else if (actionType === 'review_flag') {
+          setFlags(prev => prev.map(f => f.id === targetFlag.id ? {
+            ...f,
+            status: decision,
+            reviewedBy: currentUser.name,
+            reviewedAt: new Date().toISOString()
+          } : f));
+
+          if (decision === 'confirmed_duplicate') {
+            setOrders(prev => prev.map(o => o.id === targetOrder.id ? { ...o, status: 'Rejected', flagReason: 'Confirmed Duplicate (Voided)' } : o));
+            logAudit(currentUser.name, 'REVERSAL_ENTRY', 'Order', targetOrder.id, `Confirmed duplicate flag: voided ${formatINR(targetOrder.total)} via reversal.`);
+          } else {
+            logAudit(currentUser.name, 'FLAG_RESOLVED_VALID', 'Flag', targetFlag.id, `Cleared flag as genuine expenditure.`);
+          }
+          showToast(`Flag marked: ${decision}`, 'info');
+        }
+
+        setAuthModal(prev => ({ ...prev, isOpen: false, inputCode: '', errorMessage: '' }));
+      };
+
+      // Admin Unlock Action
+      const handleAdminUnlock = (clubId) => {
+        const club = clubs.find(c => c.id === clubId);
+        setClubs(prev => prev.map(c => c.id === clubId ? { ...c, locked: false, failedAttempts: 0 } : c));
+        logAudit(currentUser.name, 'CLUB_UNLOCKED', 'Club', clubId, `Admin security unlock granted for ${club?.name}`);
+        showToast(`Security lock cleared for ${club?.name}.`, 'success');
+      };
+
+      // CSV Export
+      const handleExportCSV = (type) => {
+        let headers = [];
+        let rows = [];
+        if (type === 'orders') {
+          headers = ['Order ID', 'Club', 'Category', 'Requested By', 'Event', 'Bill No', 'Date', 'Amount', 'Status', 'Flagged'];
+          rows = orders.map(o => [o.id, o.clubId, o.category, `"${o.requestedBy}"`, `"${o.event}"`, o.billNo, o.billDate, o.total, o.status, o.flagged ? 'YES' : 'NO']);
+        } else {
+          headers = ['Payment ID', 'Order ID', 'Club', 'Amount', 'Mode', 'Reference', 'Date', 'Signee'];
+          rows = payments.map(p => [p.id, p.orderId, p.clubId, p.amount, p.mode, `"${p.reference}"`, p.date, `"${p.recordedBy}"`]);
+        }
+        const content = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const encoded = encodeURI(content);
+        const link = document.createElement("a");
+        link.setAttribute("href", encoded);
+        link.setAttribute("download", `CampusVault_${type}_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+      // Derived Metrics & Budgets
+      const clubLedgers = useMemo(() => {
+        return clubs.map(c => {
+          const clubOrders = orders.filter(o => o.clubId === c.id);
+          const authorizedOrders = clubOrders.filter(o => ['Authorized', 'Partially paid', 'Paid'].includes(o.status));
+          const spent = authorizedOrders.reduce((sum, o) => sum + Number(o.total), 0);
+          const clubPayments = payments.filter(p => p.clubId === c.id);
+          const paid = clubPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+          const pending = Math.max(0, spent - paid);
+          const remaining = c.annualBudget - spent;
+          const percentSpent = c.annualBudget > 0 ? (spent / c.annualBudget) * 100 : 0;
+          return { ...c, spent, paid, pending, remaining, percentSpent };
+        });
+      }, [clubs, orders, payments]);
+
+      // Category Analytics based on Mobile Dashboard UI
+      const categoryMetrics = useMemo(() => {
+        const categories = ['Events', 'Marketing & Prints', 'Tech & Equipment'];
+        return categories.map(cat => {
+          const catOrders = orders.filter(o => o.category === cat && ['Authorized', 'Partially paid', 'Paid'].includes(o.status));
+          const totalSpent = catOrders.reduce((s, o) => s + o.total, 0);
+          const allocatedBudget = cat === 'Events' ? 120000 : cat === 'Marketing & Prints' ? 80000 : 200000;
+          return {
+            category: cat,
+            spent: totalSpent,
+            budget: allocatedBudget,
+            percent: Math.min(100, Math.round((totalSpent / allocatedBudget) * 100))
+          };
+        });
+      }, [orders]);
+
+      // Filtered orders for view
+      const displayOrders = useMemo(() => {
+        if (!currentUser) return [];
+        if (currentUser.role === 'member' || currentUser.role === 'treasurer') {
+          return orders.filter(o => o.clubId === currentUser.clubId);
+        }
+        return orders;
+      }, [orders, currentUser]);
+
+      // =============================================================
+      // VIEW A: AUTHENTICATION LOGIN GATE (IMMEDIATE LOGIN GUARDRAIL)
+      // =============================================================
+      if (!currentUser) {
+        return (
+          <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center p-4 relative overflow-hidden">
+            {/* Background Accent Gradients */}
+            <div className="absolute -top-40 -right-40 w-96 h-96 bg-pccoe-600/20 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div className="max-w-md w-full bg-slate-800/90 border border-slate-700 backdrop-blur-xl rounded-2xl p-6 sm:p-8 shadow-2xl text-white relative z-10">
+              
+              {/* Institution Emblem Header */}
+              <div className="text-center space-y-2 mb-6">
+                <div className="inline-flex p-3 rounded-2xl bg-gradient-to-br from-pccoe-500 to-pccoe-700 shadow-lg shadow-pccoe-500/30">
+                  <span className="text-3xl">🏛️</span>
+                </div>
+                <h1 className="text-2xl font-black tracking-tight text-white">Campus Vault</h1>
+                <p className="text-xs font-semibold text-pccoe-300 uppercase tracking-widest">
+                  PCET's Pimpri Chinchwad College of Engineering
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Authorized Financial Expense & Designated Store Purchase Gateway
+                </p>
+              </div>
+
+              {loginError && (
+                <div className="mb-4 p-3 bg-rose-500/20 border border-rose-500/50 rounded-xl text-rose-300 text-xs font-medium flex items-center space-x-2">
+                  <span>⛔</span>
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              {/* Login Form */}
+              <form onSubmit={handleLogin} className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">PCCOE Institutional Email</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="username@pccoe.edu.in"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-900/80 border border-slate-700 rounded-xl text-white text-sm focus:ring-2 focus:ring-pccoe-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Account Password</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-900/80 border border-slate-700 rounded-xl text-white text-sm focus:ring-2 focus:ring-pccoe-500 focus:outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-gradient-to-r from-pccoe-600 to-pccoe-500 hover:from-pccoe-500 hover:to-pccoe-600 text-white font-bold rounded-xl shadow-lg shadow-pccoe-600/30 transition transform active:scale-98"
+                >
+                  Verify & Access Vault &rarr;
+                </button>
+              </form>
+
+              {/* Demo Account Switcher Buttons */}
+              <div className="mt-6 pt-5 border-t border-slate-700/80 text-[11px]">
+                <p className="text-slate-400 mb-2 font-medium">Quick Demo Accounts (Click to test roles):</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {AUTHORIZED_ACCOUNTS.map((acc, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleQuickLogin(acc)}
+                      className="p-1.5 bg-slate-700/60 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-left truncate transition"
+                    >
+                      <span className="font-bold text-pccoe-300 block">{acc.role.toUpperCase()}</span>
+                      <span className="text-[10px] text-slate-400 truncate block">{acc.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        );
+      }
+
+      // =============================================================
+      // VIEW B: AUTHENTICATED CAMPUS VAULT MAIN APPLICATION
+      // =============================================================
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-100 text-slate-800">
+          
+          {/* TOAST NOTIFIER */}
+          {toast && (
+            <div className="fixed top-4 right-4 z-50">
+              <div className={`px-4 py-3 rounded-xl shadow-xl flex items-center space-x-2 text-xs font-bold ${
+                toast.type === 'success' ? 'bg-emerald-600 text-white' :
+                toast.type === 'warning' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-white'
+              }`}>
+                <span>{toast.type === 'warning' ? '⚠️' : '✓'}</span>
+                <span>{toast.message}</span>
+              </div>
+            </div>
+          )}
+
+          {/* APPLICATION TOP BAR */}
+          <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md no-print">
+            <div className="max-w-7xl mx-auto px-4 py-2.5 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+              
+              {/* Institution & App Header */}
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-pccoe-600 to-pccoe-400 flex items-center justify-center text-white font-black text-lg shadow-md border border-pccoe-300/30">
+                  CV
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h1 className="text-base font-extrabold tracking-tight text-white">Campus Vault</h1>
+                    <span className="text-[10px] bg-pccoe-500/30 text-pccoe-300 border border-pccoe-400/30 px-1.5 py-0.2 rounded font-mono">v2.0 PCCOE</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">Pimpri Chinchwad College of Engineering</p>
+                </div>
+              </div>
+
+              {/* User Session & Guardrail Status */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-xl flex items-center space-x-2 text-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <div>
+                    <span className="font-bold text-slate-200">{currentUser.name}</span>
+                    <span className="text-slate-400 text-[10px] ml-1.5 capitalize">({currentUser.role})</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setDemoShowCodes(!demoShowCodes)}
+                  className={`text-xs px-2.5 py-1.5 rounded-xl border transition ${
+                    demoShowCodes ? 'bg-amber-400 text-slate-950 font-bold border-amber-300' : 'bg-slate-800 border-slate-700 text-slate-300'
+                  }`}
+                  title="Toggle visible passcodes for testing ease"
+                >
+                  {demoShowCodes ? '🔑 Hide Codes' : '🔑 Show Passcodes'}
+                </button>
+
+                <button
+                  onClick={handleResetDemo}
+                  className="text-xs px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-300"
+                >
+                  Reset
+                </button>
+
+                <button
+                  onClick={handleLogout}
+                  className="text-xs px-2.5 py-1.5 bg-rose-600/80 hover:bg-rose-600 font-semibold rounded-xl text-white transition"
+                >
+                  Logout
+                </button>
+              </div>
+
+            </div>
+
+            {/* DEMO CODES BANNER */}
+            {demoShowCodes && (
+              <div className="bg-amber-500/10 border-t border-amber-500/30 px-4 py-1.5 text-xs text-amber-300 flex flex-wrap gap-4 items-center">
+                <span className="font-bold">🔑 Test Passcodes:</span>
+                <span>Automatons: <code className="bg-amber-400/20 px-1 py-0.5 rounded font-mono font-bold">5505</code></span>
+                <span>Kratos: <code className="bg-amber-400/20 px-1 py-0.5 rounded font-mono font-bold">2202</code></span>
+                <span>Coding Club: <code className="bg-amber-400/20 px-1 py-0.5 rounded font-mono font-bold">8808</code></span>
+                <span>IEEE PCCOE: <code className="bg-amber-400/20 px-1 py-0.5 rounded font-mono font-bold">9999</code></span>
+                <span className="text-slate-400 text-[11px] ml-auto">Protected by SHA-256 Web Crypto</span>
+              </div>
+            )}
+          </header>
+
+          {/* MAIN APPLICATION WORKSPACE */}
+          <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 flex flex-col md:flex-row gap-6">
+            
+            {/* DESKTOP SIDEBAR NAVIGATION */}
+            <aside className="w-full md:w-60 shrink-0 hidden md:block no-print">
+              <nav className="sticky top-20 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+                
+                <div className="px-3 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  Vault Workspace
+                </div>
+
+                <button
+                  onClick={() => setActiveTab('orders')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl font-semibold transition ${
+                    activeTab === 'orders' ? 'bg-pccoe-50 text-pccoe-700 font-bold' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>📦 Purchase Orders</span>
+                  <span className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-full text-[10px]">{displayOrders.length}</span>
+                </button>
+
+                {/* Only Members & Treasurers can raise PO */}
+                {['member', 'treasurer'].includes(currentUser.role) && (
+                  <button
+                    onClick={() => setActiveTab('new-order')}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl font-semibold transition ${
+                      activeTab === 'new-order' ? 'bg-pccoe-50 text-pccoe-700 font-bold' : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>✍️ Raise New Order</span>
+                    <span className="bg-pccoe-100 text-pccoe-700 px-1.5 py-0.2 rounded font-bold">+</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setActiveTab('budget')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl font-semibold transition ${
+                    activeTab === 'budget' ? 'bg-pccoe-50 text-pccoe-700 font-bold' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>📊 Budget Manager v2.0</span>
+                  <span className="bg-amber-100 text-amber-800 text-[10px] px-1 rounded font-bold">New</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('clubs')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl font-semibold transition ${
+                    activeTab === 'clubs' ? 'bg-pccoe-50 text-pccoe-700 font-bold' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>🏛️ Teams & Ledgers</span>
+                  <span className="text-slate-400 text-[10px]">{clubs.length}</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('payments')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl font-semibold transition ${
+                    activeTab === 'payments' ? 'bg-pccoe-50 text-pccoe-700 font-bold' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>💳 Payments Record</span>
+                  <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full text-[10px]">{payments.length}</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('flags')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl font-semibold transition ${
+                    activeTab === 'flags' ? 'bg-pccoe-50 text-pccoe-700 font-bold' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>🚩 Anti-Fraud Gateway</span>
+                  {flags.filter(f => f.status === 'pending').length > 0 && (
+                    <span className="bg-rose-500 text-white px-1.5 py-0.5 rounded-full text-[10px] font-bold">
+                      {flags.filter(f => f.status === 'pending').length}
+                    </span>
+                  )}
+                </button>
+
+                {currentUser.role === 'admin' && (
+                  <button
+                    onClick={() => setActiveTab('audit')}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl font-semibold transition ${
+                      activeTab === 'audit' ? 'bg-pccoe-50 text-pccoe-700 font-bold' : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>🛡️ Immutable Audit Log</span>
+                    <span className="bg-purple-100 text-purple-700 font-mono text-[10px] px-1 rounded">{auditLogs.length}</span>
+                  </button>
+                )}
+
+              </nav>
+
+              {/* Motor Sports Quick Directory from Image 1 */}
+              <div className="mt-4 p-3.5 bg-slate-900 text-white rounded-2xl text-[11px] space-y-2 shadow-sm">
+                <div className="font-bold text-pccoe-300 flex items-center justify-between">
+                  <span>Motor Sports Hub</span>
+                  <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded">PCCOE</span>
+                </div>
+                <p className="text-slate-400 text-[10px]">
+                  Designated campus stationery & technical procurement desk.
+                </p>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {['Red Baron', 'Kratos', 'Solarium', 'Ambush', 'Automatons', 'Maverick'].map((t, idx) => (
+                    <span key={idx} className="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded text-[10px]">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </aside>
+
+            {/* PRIMARY VIEW CONTENT */}
+            <main className="flex-1 min-w-0">
+              
+              {/* TAB 1: ORDERS & BILLS */}
+              {activeTab === 'orders' && (
+                <OrdersView
+                  orders={displayOrders}
+                  clubs={clubs}
+                  payments={payments}
+                  currentUser={currentUser}
+                  highValueThreshold={highValueThreshold}
+                  onTriggerSecureAction={handleTriggerSecureAction}
+                  onPrintOrder={(ord) => setPrintPreview({ type: 'order', data: ord })}
+                  onExportCSV={() => handleExportCSV('orders')}
+                  onGoToNew={() => setActiveTab('new-order')}
+                />
+              )}
+
+              {/* TAB 2: NEW PURCHASE ORDER FORM */}
+              {activeTab === 'new-order' && (
+                <NewOrderForm
+                  clubs={clubs}
+                  currentUser={currentUser}
+                  onSubmitOrder={handleCreateOrder}
+                  onCancel={() => setActiveTab('orders')}
+                />
+              )}
+
+              {/* TAB 3: BUDGET MANAGER v2.0 (From Mobile App Image) */}
+              {activeTab === 'budget' && (
+                <BudgetManagerView
+                  categoryMetrics={categoryMetrics}
+                  orders={orders}
+                  clubLedgers={clubLedgers}
+                />
+              )}
+
+              {/* TAB 4: TEAMS & CLUBS LEDGER */}
+              {activeTab === 'clubs' && (
+                <ClubsLedgerView
+                  ledgers={clubLedgers}
+                  currentUser={currentUser}
+                  onUnlockClub={handleAdminUnlock}
+                  onPrintClub={(club) => setPrintPreview({ type: 'club', data: club })}
+                />
+              )}
+
+              {/* TAB 5: PAYMENTS REGISTRY */}
+              {activeTab === 'payments' && (
+                <PaymentsListView
+                  payments={payments}
+                  clubs={clubs}
+                  currentUser={currentUser}
+                  onExportCSV={() => handleExportCSV('payments')}
+                />
+              )}
+
+              {/* TAB 6: FLAGS & ANTI-FRAUD */}
+              {activeTab === 'flags' && (
+                <FlagsSecurityView
+                  flags={flags}
+                  orders={orders}
+                  clubs={clubs}
+                  currentUser={currentUser}
+                  onTriggerSecureAction={handleTriggerSecureAction}
+                />
+              )}
+
+              {/* TAB 7: AUDIT LOG */}
+              {activeTab === 'audit' && (
+                <AuditTrailView
+                  auditLogs={auditLogs}
+                  clubs={clubs}
+                />
+              )}
+
+            </main>
+          </div>
+
+          {/* MOBILE BOTTOM NAVIGATION BAR */}
+          <nav id="bottom-nav" className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 flex justify-around items-center px-1 py-2 text-xs">
+            <button onClick={() => setActiveTab('orders')} className={`flex flex-col items-center ${activeTab === 'orders' ? 'text-pccoe-600 font-bold' : 'text-slate-500'}`}>
+              <span>📦</span><span>Orders</span>
+            </button>
+            <button onClick={() => setActiveTab('budget')} className={`flex flex-col items-center ${activeTab === 'budget' ? 'text-pccoe-600 font-bold' : 'text-slate-500'}`}>
+              <span>📊</span><span>Budget</span>
+            </button>
+            {['member', 'treasurer'].includes(currentUser.role) && (
+              <button onClick={() => setActiveTab('new-order')} className={`flex flex-col items-center ${activeTab === 'new-order' ? 'text-pccoe-600 font-bold' : 'text-slate-500'}`}>
+                <span>✍️</span><span>New PO</span>
+              </button>
+            )}
+            <button onClick={() => setActiveTab('clubs')} className={`flex flex-col items-center ${activeTab === 'clubs' ? 'text-pccoe-600 font-bold' : 'text-slate-500'}`}>
+              <span>🏛️</span><span>Teams</span>
+            </button>
+            <button onClick={() => setActiveTab('flags')} className={`flex flex-col items-center relative ${activeTab === 'flags' ? 'text-pccoe-600 font-bold' : 'text-slate-500'}`}>
+              <span>🚩</span><span>Flags</span>
+              {flags.filter(f => f.status === 'pending').length > 0 && (
+                <span className="absolute top-0 right-1 w-2 h-2 bg-rose-500 rounded-full"></span>
+              )}
+            </button>
+          </nav>
+
+          {/* ========================================================= */}
+          {/* SECURITY PASSCODE AUTHORIZATION MODAL */}
+          {/* ========================================================= */}
+          {authModal.isOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center space-x-2">
+                    <span className="p-2 bg-pccoe-50 text-pccoe-600 rounded-xl text-lg">🔐</span>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">
+                        {authModal.actionType === 'authorize' && 'Authorize Expense PO'}
+                        {authModal.actionType === 'reject' && 'Reject Expense PO'}
+                        {authModal.actionType === 'record_payment' && 'Verify Payment Signoff'}
+                        {authModal.actionType === 'review_flag' && 'Verify Duplicate Resolution'}
+                      </h3>
+                      <p className="text-[11px] text-slate-500">Security Gatekeeper verification required</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setAuthModal(prev => ({ ...prev, isOpen: false }))}
+                    className="text-slate-400 hover:text-slate-600 text-xl font-bold"
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <div className="my-4 bg-slate-50 p-3 rounded-xl text-xs space-y-1.5 border border-slate-200">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Order Reference:</span>
+                    <span className="font-bold text-slate-800">{authModal.targetOrder?.id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Event / Purpose:</span>
+                    <span className="text-slate-700">{authModal.targetOrder?.event}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Bill Total:</span>
+                    <span className="font-extrabold text-pccoe-700">{formatINR(authModal.targetOrder?.total)}</span>
+                  </div>
+                  {authModal.targetPaymentData && (
+                    <div className="flex justify-between border-t border-slate-200 pt-1 text-emerald-700 font-bold">
+                      <span>Payment to Sign:</span>
+                      <span>{formatINR(authModal.targetPaymentData.amount)} ({authModal.targetPaymentData.mode})</span>
+                    </div>
+                  )}
+                </div>
+
+                <form onSubmit={handleExecuteAuthorization} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Enter Private Treasurer Passcode
+                    </label>
+                    <input
+                      type="password"
+                      autoFocus
+                      maxLength={8}
+                      placeholder="••••"
+                      value={authModal.inputCode}
+                      onChange={(e) => setAuthModal(prev => ({ ...prev, inputCode: e.target.value, errorMessage: '' }))}
+                      className="w-full text-center tracking-widest text-2xl font-mono px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-pccoe-500 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1 text-center">
+                      3 failed entries will trigger immediate lockout of team approvals.
+                    </p>
+                  </div>
+
+                  {authModal.errorMessage && (
+                    <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
+                      ⚠️ {authModal.errorMessage}
+                    </div>
+                  )}
+
+                  <div className="flex space-x-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setAuthModal(prev => ({ ...prev, isOpen: false }))}
+                      className="flex-1 py-2 px-3 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!authModal.inputCode.trim()}
+                      className="flex-1 py-2 px-3 bg-pccoe-600 hover:bg-pccoe-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md"
+                    >
+                      Sign & Authenticate
+                    </button>
+                  </div>
+                </form>
+
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* PRINTABLE BILL VOUCHER / LEDGER MODAL */}
+          {/* ========================================================= */}
+          {printPreview && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+              <div className="bg-white rounded-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto print-card">
+                <div className="flex justify-between items-center mb-6 no-print border-b pb-3">
+                  <h3 className="font-bold text-slate-800">Print Preview</h3>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => window.print()}
+                      className="px-3 py-1.5 bg-pccoe-600 text-white text-xs font-bold rounded-xl shadow hover:bg-pccoe-700"
+                    >
+                      🖨️ Print Document
+                    </button>
+                    <button
+                      onClick={() => setPrintPreview(null)}
+                      className="px-3 py-1.5 border border-slate-300 text-xs font-semibold rounded-xl text-slate-700"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+
+                {printPreview.type === 'order' && (
+                  <div className="space-y-4 text-slate-800 text-xs">
+                    <div className="border-b pb-4 text-center">
+                      <h2 className="text-base font-extrabold uppercase tracking-wide">Pimpri Chinchwad College of Engineering</h2>
+                      <p className="text-slate-500">Designated Stationery & Refreshments Shop Procurement Voucher</p>
+                      <p className="font-mono mt-1 text-slate-600">PO: {printPreview.data.id} | Shop Bill No: {printPreview.data.billNo}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-slate-500">Club / Unit:</p>
+                        <p className="font-bold text-slate-900">{clubs.find(c => c.id === printPreview.data.clubId)?.name}</p>
+                        <p className="text-slate-500 mt-1">Requested By: <span className="font-semibold text-slate-900">{printPreview.data.requestedBy}</span></p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-slate-500">Date: <span className="font-bold text-slate-800">{printPreview.data.billDate}</span></p>
+                        <p className="text-slate-500">Category: <span className="font-bold text-slate-800">{printPreview.data.category}</span></p>
+                        <p className="mt-1">Status: <span className="font-bold text-pccoe-700 uppercase">{printPreview.data.status}</span></p>
+                      </div>
+                    </div>
+
+                    <table className="w-full text-left border border-slate-200 mt-4">
+                      <thead className="bg-slate-100 border-b">
+                        <tr>
+                          <th className="p-2">Item Description</th>
+                          <th className="p-2 text-center">Qty</th>
+                          <th className="p-2 text-right">Unit Price</th>
+                          <th className="p-2 text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {printPreview.data.items.map((it, idx) => (
+                          <tr key={idx}>
+                            <td className="p-2">{it.name}</td>
+                            <td className="p-2 text-center">{it.qty}</td>
+                            <td className="p-2 text-right">{formatINR(it.price)}</td>
+                            <td className="p-2 text-right font-medium">{formatINR(it.qty * it.price)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-slate-50 font-bold border-t">
+                        <tr>
+                          <td colSpan={3} className="p-2 text-right">Grand Total:</td>
+                          <td className="p-2 text-right text-pccoe-700">{formatINR(printPreview.data.total)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+
+                    <div className="mt-8 pt-4 border-t grid grid-cols-2 gap-8 text-[10px] text-center text-slate-500">
+                      <div>
+                        <div className="h-10 border-b border-slate-300"></div>
+                        <p className="mt-1">Faculty In-Charge / Treasurer Sign</p>
+                      </div>
+                      <div>
+                        <div className="h-10 border-b border-slate-300"></div>
+                        <p className="mt-1">Campus Store Official Stamp</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // =============================================================
+    // SECTION 4: SUB-COMPONENTS & VIEWS
+    // =============================================================
+
+    // -------------------------------------------------------------
+    // 4.1: ORDERS LIST VIEW
+    // -------------------------------------------------------------
+    function OrdersView({ orders, clubs, payments, currentUser, highValueThreshold, onTriggerSecureAction, onPrintOrder, onExportCSV, onGoToNew }) {
+      const [filterStatus, setFilterStatus] = useState('all');
+      const [filterCategory, setFilterCategory] = useState('all');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [paymentModalOrder, setPaymentModalOrder] = useState(null);
+
+      const [payForm, setPayForm] = useState({
+        amount: '',
+        mode: 'UPI',
+        reference: '',
+        date: new Date().toISOString().slice(0, 10),
+        note: '',
+        error: ''
+      });
+
+      const filtered = useMemo(() => {
+        return orders.filter(o => {
+          if (filterStatus !== 'all' && o.status !== filterStatus) return false;
+          if (filterCategory !== 'all' && o.category !== filterCategory) return false;
+          if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            const clubName = (clubs.find(c => c.id === o.clubId)?.name || '').toLowerCase();
+            const match = o.id.toLowerCase().includes(q) ||
+                          o.billNo.toLowerCase().includes(q) ||
+                          o.event.toLowerCase().includes(q) ||
+                          clubName.includes(q);
+            if (!match) return false;
+          }
+          return true;
+        });
+      }, [orders, filterStatus, filterCategory, searchQuery, clubs]);
+
+      const getOrderPaidTotal = (ordId) => {
+        return payments.filter(p => p.orderId === ordId).reduce((s, p) => s + p.amount, 0);
+      };
+
+      const handleInitiatePayment = (ord) => {
+        const paid = getOrderPaidTotal(ord.id);
+        const due = ord.total - paid;
+        setPayForm({
+          amount: due.toString(),
+          mode: 'UPI',
+          reference: '',
+          date: new Date().toISOString().slice(0, 10),
+          note: '',
+          error: ''
+        });
+        setPaymentModalOrder(ord);
+      };
+
+      const handleVerifyPaymentDispatch = (e) => {
+        e.preventDefault();
+        const amt = Number(payForm.amount);
+        const paid = getOrderPaidTotal(paymentModalOrder.id);
+        const due = paymentModalOrder.total - paid;
+
+        if (isNaN(amt) || amt <= 0) {
+          setPayForm(prev => ({ ...prev, error: 'Please enter a positive numeric value.' }));
+          return;
+        }
+        if (amt > due) {
+          setPayForm(prev => ({ ...prev, error: `Overpayment Guardrail: Max payable balance is ${formatINR(due)}.` }));
+          return;
+        }
+
+        onTriggerSecureAction('record_payment', paymentModalOrder, { paymentData: payForm });
+        setPaymentModalOrder(null);
+      };
+
+      return (
+        <div className="space-y-4">
+          
+          {/* Header Controls */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Purchase Orders Registry</h2>
+              <p className="text-xs text-slate-500">Live verified orders for stationery, eatables, and event utilities</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={onExportCSV}
+                className="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl border border-slate-300"
+              >
+                📥 Export CSV
+              </button>
+              {['member', 'treasurer'].includes(currentUser.role) && (
+                <button
+                  onClick={onGoToNew}
+                  className="px-3 py-1.5 text-xs font-bold bg-pccoe-600 hover:bg-pccoe-700 text-white rounded-xl shadow-sm"
+                >
+                  + Raise New PO
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filters Bar */}
+          <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              placeholder="Search by Bill #, PO ID, Team, Event..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 text-xs px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-pccoe-500"
+            />
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="text-xs px-2.5 py-2 border rounded-xl bg-white"
+            >
+              <option value="all">All Categories</option>
+              <option value="Events">Events</option>
+              <option value="Marketing & Prints">Marketing & Prints</option>
+              <option value="Tech & Equipment">Tech & Equipment</option>
+            </select>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="text-xs px-2.5 py-2 border rounded-xl bg-white"
+            >
+              <option value="all">All Statuses</option>
+              <option value="Awaiting code">Awaiting Code</option>
+              <option value="Authorized">Authorized</option>
+              <option value="Partially paid">Partially Paid</option>
+              <option value="Paid">Paid in Full</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+          </div>
+
+          {/* Orders Cards Grid */}
+          <div className="space-y-3">
+            {filtered.map(order => {
+              const club = clubs.find(c => c.id === order.clubId);
+              const paid = getOrderPaidTotal(order.id);
+              const due = Math.max(0, order.total - paid);
+              const isHigh = order.total >= highValueThreshold;
+
+              return (
+                <div key={order.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center space-x-2 flex-wrap">
+                      <span className="font-mono font-bold text-xs bg-slate-100 text-slate-800 px-2 py-0.5 rounded-lg">
+                        {order.id}
+                      </span>
+                      <span className="text-xs font-bold text-slate-900">{club?.name}</span>
+                      
+                      {/* Category Badge */}
+                      <span className="text-[10px] font-semibold bg-pccoe-50 text-pccoe-700 border border-pccoe-200 px-2 py-0.5 rounded-full">
+                        {order.category}
+                      </span>
+
+                      {/* Status Badge */}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        order.status === 'Paid' ? 'bg-emerald-100 text-emerald-800' :
+                        order.status === 'Partially paid' ? 'bg-amber-100 text-amber-800' :
+                        order.status === 'Authorized' ? 'bg-blue-100 text-blue-800' :
+                        order.status === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {order.status}
+                      </span>
+
+                      {/* High value anomaly badge */}
+                      {isHigh && (
+                        <span className="text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200 px-1.5 py-0.5 rounded uppercase">
+                          ⚠️ High value (&gt; {formatINR(highValueThreshold)})
+                        </span>
+                      )}
+
+                      {/* Duplicate badge */}
+                      {order.flagged && (
+                        <span className="text-[10px] font-bold bg-rose-600 text-white px-1.5 py-0.5 rounded">
+                          FLAGGED DUPLICATE
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-xs text-slate-400">
+                      Date: <strong className="text-slate-700">{order.billDate}</strong> | Bill #{' '}
+                      <strong className="text-slate-800">{order.billNo}</strong>
+                    </div>
+                  </div>
+
+                  {order.flagged && (
+                    <div className="p-2 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium">
+                      🚨 <strong>Guardrail Alert:</strong> {order.flagReason}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <span className="text-slate-400 block">Event / Purpose:</span>
+                      <span className="font-semibold text-slate-800">{order.event}</span>
+                      <span className="text-slate-400 block text-[11px]">Requested: {order.requestedBy}</span>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-400 block">Line Items:</span>
+                      <ul className="text-slate-600 text-[11px] space-y-0.5">
+                        {order.items.slice(0, 2).map((it, idx) => (
+                          <li key={idx}>• {it.name} ({it.qty} × {formatINR(it.price)})</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="md:text-right">
+                      <span className="text-slate-400 block">Total Expenditure:</span>
+                      <span className="text-base font-black text-pccoe-700">{formatINR(order.total)}</span>
+                      {order.status !== 'Awaiting code' && (
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          Paid: <strong className="text-emerald-700">{formatINR(paid)}</strong> | Due: <strong className="text-amber-700">{formatINR(due)}</strong>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions Bar */}
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <button
+                      onClick={() => onPrintOrder(order)}
+                      className="text-xs text-slate-500 hover:text-slate-800 font-semibold"
+                    >
+                      🖨️ View Voucher
+                    </button>
+
+                    <div className="flex items-center space-x-2">
+                      {/* Treasurer Approval */}
+                      {currentUser.role === 'treasurer' && currentUser.clubId === order.clubId && order.status === 'Awaiting code' && (
+                        <>
+                          <button
+                            onClick={() => onTriggerSecureAction('reject', order)}
+                            className="px-2.5 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            onClick={() => onTriggerSecureAction('authorize', order)}
+                            className="px-3 py-1 text-xs font-bold bg-pccoe-600 hover:bg-pccoe-700 text-white rounded-lg shadow-sm"
+                          >
+                            Authorize PO &rarr;
+                          </button>
+                        </>
+                      )}
+
+                      {/* Payment Trigger */}
+                      {['treasurer', 'shopkeeper'].includes(currentUser.role) && ['Authorized', 'Partially paid'].includes(order.status) && (
+                        <button
+                          onClick={() => handleInitiatePayment(order)}
+                          className="px-3 py-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm"
+                        >
+                          Record Payment ({formatINR(due)} due)
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+              );
+            })}
+          </div>
+
+          {/* RECORD PAYMENT MODAL */}
+          {paymentModalOrder && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+                <div className="flex justify-between items-center pb-3 border-b">
+                  <h3 className="text-sm font-bold text-slate-900">Record Payment for {paymentModalOrder.id}</h3>
+                  <button onClick={() => setPaymentModalOrder(null)} className="text-slate-400 text-xl font-bold">&times;</button>
+                </div>
+
+                <form onSubmit={handleVerifyPaymentDispatch} className="space-y-3 mt-4 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Amount to Settle (INR) *</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={paymentModalOrder.total - getOrderPaidTotal(paymentModalOrder.id)}
+                      value={payForm.amount}
+                      onChange={(e) => setPayForm(prev => ({ ...prev, amount: e.target.value, error: '' }))}
+                      className="w-full p-2.5 border rounded-xl font-bold text-sm focus:outline-none focus:ring-2 focus:ring-pccoe-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Mode *</label>
+                      <select
+                        value={payForm.mode}
+                        onChange={(e) => setPayForm(prev => ({ ...prev, mode: e.target.value }))}
+                        className="w-full p-2 border rounded-xl bg-white"
+                      >
+                        <option value="UPI">Official Campus UPI</option>
+                        <option value="Cash">Cash at Store Desk</option>
+                        <option value="Bank transfer">IMPS / NEFT</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Payment Date *</label>
+                      <input
+                        type="date"
+                        required
+                        value={payForm.date}
+                        onChange={(e) => setPayForm(prev => ({ ...prev, date: e.target.value }))}
+                        className="w-full p-2 border rounded-xl bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Transaction Ref / UTR *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. UPI/PCCOE/20260928/19482"
+                      value={payForm.reference}
+                      onChange={(e) => setPayForm(prev => ({ ...prev, reference: e.target.value }))}
+                      className="w-full p-2 border rounded-xl font-mono"
+                    />
+                  </div>
+
+                  {payForm.error && (
+                    <div className="p-2 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl font-medium">
+                      ⚠️ {payForm.error}
+                    </div>
+                  )}
+
+                  <div className="flex space-x-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentModalOrder(null)}
+                      className="flex-1 py-2 border rounded-xl text-slate-700 font-semibold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow"
+                    >
+                      Verify Passcode &rarr;
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // 4.2: NEW ORDER FORM
+    // -------------------------------------------------------------
+    function NewOrderForm({ clubs, currentUser, onSubmitOrder, onCancel }) {
+      const defaultClub = currentUser.clubId || clubs[0]?.id || 'automatons';
+      const [clubId, setClubId] = useState(defaultClub);
+      const [subClub, setSubClub] = useState('');
+      const [category, setCategory] = useState('Tech & Equipment');
+      const [requestedBy, setRequestedBy] = useState(currentUser.name);
+      const [event, setEvent] = useState('');
+      const [billNo, setBillNo] = useState('');
+      const [billDate, setBillDate] = useState(new Date().toISOString().slice(0, 10));
+
+      const [items, setItems] = useState([
+        { name: 'Hardware Wires & Tapes', qty: 4, price: 120 },
+        { name: 'Refreshment Packets', qty: 20, price: 30 }
+      ]);
+
+      const selectedClub = useMemo(() => clubs.find(c => c.id === clubId), [clubs, clubId]);
+
+      const total = useMemo(() => {
+        return items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
+      }, [items]);
+
+      const handleAddItem = () => setItems([...items, { name: '', qty: 1, price: 0 }]);
+      const handleRemoveItem = (idx) => {
+        if (items.length > 1) setItems(items.filter((_, i) => i !== idx));
+      };
+      const handleItemChange = (idx, field, val) => {
+        const copy = [...items];
+        copy[idx][field] = field === 'name' ? val : Number(val);
+        setItems(copy);
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        const today = new Date().toISOString().slice(0, 10);
+        if (billDate > today) {
+          alert("Validation Guardrail: Bill date cannot be in the future.");
+          return;
+        }
+
+        onSubmitOrder({
+          clubId,
+          subClub: selectedClub?.type === 'major' ? subClub : '',
+          category,
+          requestedBy: sanitize(requestedBy),
+          event: sanitize(event),
+          billNo: sanitize(billNo).toUpperCase(),
+          billDate,
+          items: items.map(it => ({ name: sanitize(it.name), qty: Number(it.qty), price: Number(it.price) })),
+          total
+        });
+      };
+
+      return (
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm max-w-3xl mx-auto space-y-4">
+          <div className="border-b pb-3">
+            <h2 className="text-sm font-bold text-slate-900">Raise New Purchase Request</h2>
+            <p className="text-xs text-slate-500">
+              Orders enter Campus Vault as <strong className="text-slate-700">"Awaiting treasurer code"</strong> and are never counted against budget until authenticated.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Club / Department *</label>
+                <select
+                  disabled={Boolean(currentUser.clubId)}
+                  value={clubId}
+                  onChange={(e) => setClubId(e.target.value)}
+                  className="w-full p-2.5 border rounded-xl bg-white disabled:bg-slate-100"
+                >
+                  {clubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Budget Category (Image 2) *</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full p-2.5 border rounded-xl bg-white font-medium text-pccoe-700"
+                >
+                  <option value="Events">Events</option>
+                  <option value="Marketing & Prints">Marketing & Prints</option>
+                  <option value="Tech & Equipment">Tech & Equipment</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Requested By *</label>
+                <input
+                  type="text"
+                  required
+                  value={requestedBy}
+                  onChange={(e) => setRequestedBy(e.target.value)}
+                  className="w-full p-2.5 border rounded-xl"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Event / Milestone Purpose *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Supra SAE Brake Pad Testing"
+                  value={event}
+                  onChange={(e) => setEvent(e.target.value)}
+                  className="w-full p-2.5 border rounded-xl"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Shop Physical Bill Number *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. SHP-9821"
+                  value={billNo}
+                  onChange={(e) => setBillNo(e.target.value)}
+                  className="w-full p-2.5 border rounded-xl font-mono uppercase"
+                />
+                <p className="text-[10px] text-slate-400 mt-0.5">Scanned for duplicate collisions across campus records.</p>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Bill Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={billDate}
+                  onChange={(e) => setBillDate(e.target.value)}
+                  className="w-full p-2.5 border rounded-xl"
+                />
+              </div>
+            </div>
+
+            {/* Line Items */}
+            <div className="p-3 bg-slate-50 border rounded-2xl space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-slate-800">Stationery & Refreshment Items</span>
+                <button
+                  type="button"
+                  onClick={handleAddItem}
+                  className="px-2 py-1 bg-white border text-pccoe-600 font-bold rounded-lg text-xs"
+                >
+                  + Add Item
+                </button>
+              </div>
+
+              {items.map((it, idx) => (
+                <div key={idx} className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    placeholder="Description"
+                    value={it.name}
+                    onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
+                    className="flex-3 w-full p-2 border rounded-lg bg-white"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    value={it.qty}
+                    onChange={(e) => handleItemChange(idx, 'qty', e.target.value)}
+                    className="w-16 p-2 border rounded-lg bg-white text-center"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    value={it.price}
+                    onChange={(e) => handleItemChange(idx, 'price', e.target.value)}
+                    className="w-24 p-2 border rounded-lg bg-white text-right"
+                  />
+                  <div className="w-24 text-right font-bold text-slate-800">
+                    {formatINR((it.qty || 0) * (it.price || 0))}
+                  </div>
+                  {items.length > 1 && (
+                    <button type="button" onClick={() => handleRemoveItem(idx)} className="text-rose-500 font-bold px-1.5">✕</button>
+                  )}
+                </div>
+              ))}
+
+              <div className="pt-2 border-t flex justify-between font-bold text-sm">
+                <span>Total PO Amount:</span>
+                <span className="text-pccoe-700">{formatINR(total)}</span>
+              </div>
+            </div>
+
+            <div className="flex space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="w-1/3 py-2.5 border rounded-xl font-bold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="w-2/3 py-2.5 bg-pccoe-600 hover:bg-pccoe-700 text-white font-bold rounded-xl shadow-md"
+              >
+                Submit Purchase Request &rarr;
+              </button>
+            </div>
+          </form>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // 4.3: BUDGET MANAGER v2.0 (From Mobile App Mockup Image 2)
+    // -------------------------------------------------------------
+    function BudgetManagerView({ categoryMetrics, orders, clubLedgers }) {
+      return (
+        <div className="space-y-4">
+          
+          {/* Header styled like Mobile Screenshot */}
+          <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-md space-y-3">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-black tracking-tight">Club Budget Manager v2.0</h2>
+                <p className="text-xs text-slate-400">Live categorical allocation gauges & expenditure tracking</p>
+              </div>
+              <div className="p-2 bg-slate-800 rounded-xl">📊</div>
+            </div>
+
+            {/* Horizontal Gauges styled identical to Image 2 */}
+            <div className="space-y-3 pt-2">
+              {categoryMetrics.map((cat, idx) => (
+                <div key={idx} className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-300 font-semibold">{cat.category}</span>
+                    <span className="font-mono text-slate-200">
+                      {formatINR(cat.spent)} / {formatINR(cat.budget)}
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-800 h-3 rounded-full overflow-hidden flex">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        idx === 0 ? 'bg-indigo-500' : idx === 1 ? 'bg-emerald-400' : 'bg-amber-400'
+                      }`}
+                      style={{ width: `${cat.percent}%` }}
+                    ></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Categorized Purchases Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="p-3.5 border-b bg-slate-50 font-bold text-xs text-slate-800">
+              Categorized Expense Vouchers
+            </div>
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-100 border-b text-slate-600">
+                <tr>
+                  <th className="p-3">ID</th>
+                  <th className="p-3">Expense Title</th>
+                  <th className="p-3">Vendor / Shop</th>
+                  <th className="p-3">Category</th>
+                  <th className="p-3 text-right">Amount</th>
+                  <th className="p-3 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {orders.map(o => (
+                  <tr key={o.id} className="hover:bg-slate-50">
+                    <td className="p-3 font-mono font-bold text-slate-700">{o.id}</td>
+                    <td className="p-3 font-semibold text-slate-900">{o.event}</td>
+                    <td className="p-3 text-slate-500">Designated Campus Shop</td>
+                    <td className="p-3">
+                      <span className="px-2 py-0.5 bg-pccoe-50 text-pccoe-700 rounded-full font-medium text-[11px]">
+                        {o.category}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right font-bold text-slate-900">{formatINR(o.total)}</td>
+                    <td className="p-3 text-center">
+                      <span className="px-2 py-0.5 bg-slate-100 font-bold rounded text-[10px]">
+                        {o.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // 4.4: TEAMS & CLUBS LEDGER (Includes Image 1 Table Details)
+    // -------------------------------------------------------------
+    function ClubsLedgerView({ ledgers, currentUser, onUnlockClub, onPrintClub }) {
+      return (
+        <div className="space-y-4">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">PCCOE Teams & Faculty Governance</h2>
+              <p className="text-xs text-slate-500">Secretaries, Co-Secretaries, and Departmental Financial Allotments</p>
+            </div>
+            <span className="text-xs font-mono bg-pccoe-50 text-pccoe-700 px-2 py-1 rounded-xl font-bold">
+              {ledgers.length} Registered Units
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {ledgers.map(club => {
+              const isOver80 = club.percentSpent >= 80;
+              const isOverBudget = club.percentSpent > 100;
+
+              return (
+                <div key={club.id} className={`bg-white rounded-2xl border p-4 shadow-sm space-y-3 ${club.locked ? 'border-rose-400 bg-rose-50/20' : 'border-slate-200'}`}>
+                  
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <h3 className="font-bold text-sm text-slate-900">{club.name}</h3>
+                        {club.locked && (
+                          <span className="text-[10px] bg-rose-600 text-white font-bold px-1.5 py-0.5 rounded">
+                            LOCKED (3 WRONG PASSCODES)
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500">{club.category}</p>
+                    </div>
+
+                    <span className="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg font-mono">
+                      {club.type === 'major' ? 'Major Branch' : 'Association'}
+                    </span>
+                  </div>
+
+                  {/* Secretary & Co-Secretary Details from Image 1 */}
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-[11px] grid grid-cols-2 gap-2 text-slate-700">
+                    <div>
+                      <span className="text-slate-400 block text-[10px] font-bold uppercase">Secretary</span>
+                      <span className="font-semibold text-slate-900">{club.secretary || club.treasurerName}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px] font-bold uppercase">Co-Secretary</span>
+                      <span className="font-semibold text-slate-900">{club.coSecretary || 'N/A'}</span>
+                    </div>
+                  </div>
+
+                  {/* Budget Progress Bar */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span>Spent: {formatINR(club.spent)} ({Math.round(club.percentSpent)}%)</span>
+                      <span>Budget: {formatINR(club.annualBudget)}</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-500 ${
+                          isOverBudget ? 'bg-rose-600' : isOver80 ? 'bg-amber-500' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${Math.min(100, club.percentSpent)}%` }}
+                      ></div>
+                    </div>
+                    {isOverBudget && <p className="text-[10px] text-rose-600 font-bold">⚠️ Budget Exceeded!</p>}
+                    {isOver80 && !isOverBudget && <p className="text-[10px] text-amber-600 font-bold">⚠️ Notice: Past 80% allocation limit.</p>}
+                  </div>
+
+                  {/* Financial Metrics */}
+                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2 rounded-xl text-center text-xs">
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">PAID</span>
+                      <span className="font-bold text-emerald-700">{formatINR(club.paid)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">STORE DUES</span>
+                      <span className="font-bold text-amber-700">{formatINR(club.pending)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">REMAINING</span>
+                      <span className="font-bold text-slate-800">{formatINR(club.remaining)}</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t flex justify-between items-center text-xs">
+                    <button onClick={() => onPrintClub(club)} className="text-pccoe-600 font-bold hover:underline">
+                      Print Statement &rarr;
+                    </button>
+                    {currentUser.role === 'admin' && club.locked && (
+                      <button
+                        onClick={() => onUnlockClub(club.id)}
+                        className="px-2.5 py-1 bg-rose-600 text-white font-bold rounded-lg text-xs shadow"
+                      >
+                        Reset & Unlock Team
+                      </button>
+                    )}
+                  </div>
+
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // 4.5: PAYMENTS LIST VIEW
+    // -------------------------------------------------------------
+    function PaymentsListView({ payments, clubs, currentUser, onExportCSV }) {
+      return (
+        <div className="space-y-4">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Payments Registry</h2>
+              <p className="text-xs text-slate-500">Official cleared settlements with designated campus shopkeeper</p>
+            </div>
+            <button
+              onClick={onExportCSV}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold border"
+            >
+              Export CSV
+            </button>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b text-slate-600 font-semibold">
+                <tr>
+                  <th className="p-3">Payment ID</th>
+                  <th className="p-3">Order Ref</th>
+                  <th className="p-3">Club</th>
+                  <th className="p-3">Date</th>
+                  <th className="p-3">Mode</th>
+                  <th className="p-3 font-mono">Reference / UTR</th>
+                  <th className="p-3 text-right">Amount</th>
+                  <th className="p-3">Signed By</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {payments.map(p => {
+                  const club = clubs.find(c => c.id === p.clubId);
+                  return (
+                    <tr key={p.id} className="hover:bg-slate-50">
+                      <td className="p-3 font-mono font-bold text-slate-800">{p.id}</td>
+                      <td className="p-3 font-mono text-pccoe-600">{p.orderId}</td>
+                      <td className="p-3 font-medium text-slate-900">{club?.name}</td>
+                      <td className="p-3 text-slate-500">{p.date}</td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold">
+                          {p.mode}
+                        </span>
+                      </td>
+                      <td className="p-3 font-mono text-slate-700">{p.reference}</td>
+                      <td className="p-3 text-right font-extrabold text-emerald-700">{formatINR(p.amount)}</td>
+                      <td className="p-3 text-slate-500">{p.recordedBy}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // 4.6: FLAGS & ANTI-FRAUD VIEW
+    // -------------------------------------------------------------
+    function FlagsSecurityView({ flags, orders, clubs, currentUser, onTriggerSecureAction }) {
+      return (
+        <div className="space-y-4">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <h2 className="text-sm font-bold text-slate-900">Anti-Fraud & Security Gatekeeper Center</h2>
+            <p className="text-xs text-slate-500">Heuristic guards against duplicate bills, unauthorized claims, and expense collisions</p>
+          </div>
+
+          <div className="space-y-3">
+            {flags.map(f => {
+              const order = orders.find(o => o.id === f.orderId);
+              const club = clubs.find(c => c.id === f.clubId);
+
+              return (
+                <div key={f.id} className="bg-white p-4 rounded-2xl border border-rose-200 shadow-sm space-y-3">
+                  <div className="flex justify-between items-center border-b border-rose-100 pb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="px-2 py-0.5 bg-rose-100 text-rose-800 font-mono text-xs font-bold rounded-lg">
+                        {f.id}
+                      </span>
+                      <span className="text-xs font-bold text-slate-900">{club?.name}</span>
+                    </div>
+
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      f.status === 'pending' ? 'bg-amber-100 text-amber-800' :
+                      f.status === 'confirmed_duplicate' ? 'bg-rose-600 text-white' : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {f.status === 'pending' ? 'Pending Review' : f.status === 'confirmed_duplicate' ? 'Confirmed Duplicate (Voided)' : 'Cleared Valid'}
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-rose-50/70 border border-rose-200 rounded-xl text-xs text-rose-800">
+                    <strong>Guardrail Breach Reason:</strong> {f.reason}
+                  </div>
+
+                  {order && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-600">
+                      <div>Event: <strong className="text-slate-900">{order.event}</strong></div>
+                      <div>Bill No: <strong className="text-slate-900">{order.billNo}</strong></div>
+                      <div>Amount: <strong className="text-pccoe-700">{formatINR(order.total)}</strong></div>
+                      <div>Date: <strong className="text-slate-900">{order.billDate}</strong></div>
+                    </div>
+                  )}
+
+                  {f.status === 'pending' && (
+                    <div className="pt-2 border-t flex justify-end space-x-2 text-xs">
+                      {['treasurer', 'admin'].includes(currentUser.role) ? (
+                        <>
+                          <button
+                            onClick={() => onTriggerSecureAction('review_flag', order, { flag: f, decision: 'resolved_valid' })}
+                            className="px-3 py-1.5 border rounded-xl font-bold text-slate-700 hover:bg-slate-50"
+                          >
+                            Mark Valid with Passcode
+                          </button>
+                          <button
+                            onClick={() => onTriggerSecureAction('review_flag', order, { flag: f, decision: 'confirmed_duplicate' })}
+                            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-sm"
+                          >
+                            Confirm Duplicate (Void Entry)
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-slate-400 italic">Reviewable only by authorized faculty coordinators.</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // 4.7: AUDIT TRAIL VIEW (ADMIN EXCLUSIVE)
+    // -------------------------------------------------------------
+    function AuditTrailView({ auditLogs, clubs }) {
+      return (
+        <div className="space-y-4">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="px-2 py-0.5 bg-purple-100 text-purple-800 font-mono text-[10px] font-bold rounded">
+                  APPEND-ONLY
+                </span>
+                <h2 className="text-sm font-bold text-slate-900">Immutable Audit Trail ({auditLogs.length} Events)</h2>
+              </div>
+              <p className="text-xs text-slate-500">Every passcode attempt, PO signoff, lockout, and reversal is logged permanently.</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto shadow-sm">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-slate-50 border-b text-slate-600 font-sans font-semibold">
+                <tr>
+                  <th className="p-3">Log ID</th>
+                  <th className="p-3">Timestamp</th>
+                  <th className="p-3">Actor</th>
+                  <th className="p-3">Action</th>
+                  <th className="p-3">Target Entity</th>
+                  <th className="p-3 font-sans">Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {auditLogs.map(log => {
+                  const isAlert = ['CLUB_LOCKED', 'FAILED_CODE_ATTEMPT', 'DUPLICATE_FLAGGED'].includes(log.action);
+                  return (
+                    <tr key={log.id} className={isAlert ? 'bg-rose-50/50' : 'hover:bg-slate-50'}>
+                      <td className="p-3 text-slate-400">{log.id}</td>
+                      <td className="p-3 text-slate-500 whitespace-nowrap">{log.timestamp.replace('T', ' ').slice(0, 19)}</td>
+                      <td className="p-3 font-sans font-semibold text-slate-800">{log.actor}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-sans ${
+                          log.action === 'ORDER_AUTHORIZED' ? 'bg-blue-100 text-blue-800' :
+                          log.action === 'PAYMENT_RECORDED' ? 'bg-emerald-100 text-emerald-800' :
+                          log.action === 'CLUB_LOCKED' ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-700'
+                        }`}>
+                          {log.action}
+                        </span>
+                      </td>
+                      <td className="p-3 text-slate-700">{log.entity} #{log.entityId}</td>
+                      <td className="p-3 font-sans text-slate-700">{log.details}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    // Render into Root
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<CampusVaultApp />);
+  </script>
+</body>
+</html>
